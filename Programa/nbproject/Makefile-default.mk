@@ -51,17 +51,17 @@ OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
 # Source Files Quoted if spaced
-SOURCEFILES_QUOTED_IF_SPACED=main.c sd/fsio.c sd/sd_spi.c flash/NVMem.c
+SOURCEFILES_QUOTED_IF_SPACED=main.c sd/fsio.c sd/sd_spi.c flash/flash.c
 
 # Object Files Quoted if spaced
-OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/main.o ${OBJECTDIR}/sd/fsio.o ${OBJECTDIR}/sd/sd_spi.o ${OBJECTDIR}/flash/NVMem.o
-POSSIBLE_DEPFILES=${OBJECTDIR}/main.o.d ${OBJECTDIR}/sd/fsio.o.d ${OBJECTDIR}/sd/sd_spi.o.d ${OBJECTDIR}/flash/NVMem.o.d
+OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/main.o ${OBJECTDIR}/sd/fsio.o ${OBJECTDIR}/sd/sd_spi.o ${OBJECTDIR}/flash/flash.o
+POSSIBLE_DEPFILES=${OBJECTDIR}/main.o.d ${OBJECTDIR}/sd/fsio.o.d ${OBJECTDIR}/sd/sd_spi.o.d ${OBJECTDIR}/flash/flash.o.d
 
 # Object Files
-OBJECTFILES=${OBJECTDIR}/main.o ${OBJECTDIR}/sd/fsio.o ${OBJECTDIR}/sd/sd_spi.o ${OBJECTDIR}/flash/NVMem.o
+OBJECTFILES=${OBJECTDIR}/main.o ${OBJECTDIR}/sd/fsio.o ${OBJECTDIR}/sd/sd_spi.o ${OBJECTDIR}/flash/flash.o
 
 # Source Files
-SOURCEFILES=main.c sd/fsio.c sd/sd_spi.c flash/NVMem.c
+SOURCEFILES=main.c sd/fsio.c sd/sd_spi.c flash/flash.c
 
 
 
@@ -119,11 +119,11 @@ ${OBJECTDIR}/sd/sd_spi.o: sd/sd_spi.c  .generated_files/flags/default/d0e3cbc3d7
 	@${RM} ${OBJECTDIR}/sd/sd_spi.o 
 	${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1  -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -Os -fno-common -MP -MMD -MF "${OBJECTDIR}/sd/sd_spi.o.d" -o ${OBJECTDIR}/sd/sd_spi.o sd/sd_spi.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD)  -mdfp="${DFP_DIR}"  
 	
-${OBJECTDIR}/flash/NVMem.o: flash/NVMem.c  .generated_files/flags/default/46cb1871ea524bc387a7e944e50f7514d6233727 .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
+${OBJECTDIR}/flash/flash.o: flash/flash.c  .generated_files/flags/default/2292c1f3625d66c236de5a5cf03bad483b9c3fb6 .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
 	@${MKDIR} "${OBJECTDIR}/flash" 
-	@${RM} ${OBJECTDIR}/flash/NVMem.o.d 
-	@${RM} ${OBJECTDIR}/flash/NVMem.o 
-	${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1  -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -Os -fno-common -MP -MMD -MF "${OBJECTDIR}/flash/NVMem.o.d" -o ${OBJECTDIR}/flash/NVMem.o flash/NVMem.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD)  -mdfp="${DFP_DIR}"  
+	@${RM} ${OBJECTDIR}/flash/flash.o.d 
+	@${RM} ${OBJECTDIR}/flash/flash.o 
+	${MP_CC}  $(MP_EXTRA_CC_PRE) -g -D__DEBUG -D__MPLAB_DEBUGGER_PK3=1  -fframe-base-loclist  -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -Os -fno-common -MP -MMD -MF "${OBJECTDIR}/flash/flash.o.d" -o ${OBJECTDIR}/flash/flash.o flash/flash.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD)  -mdfp="${DFP_DIR}"  
 	
 else
 ${OBJECTDIR}/main.o: main.c  .generated_files/flags/default/8bd240db66e50e6cd0e9cb2b4a1a935110cd5d9c .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
@@ -144,11 +144,11 @@ ${OBJECTDIR}/sd/sd_spi.o: sd/sd_spi.c  .generated_files/flags/default/6c1bd51796
 	@${RM} ${OBJECTDIR}/sd/sd_spi.o 
 	${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -Os -fno-common -MP -MMD -MF "${OBJECTDIR}/sd/sd_spi.o.d" -o ${OBJECTDIR}/sd/sd_spi.o sd/sd_spi.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD)  -mdfp="${DFP_DIR}"  
 	
-${OBJECTDIR}/flash/NVMem.o: flash/NVMem.c  .generated_files/flags/default/c152fa2d7f3f83657859d6f46423cc27bd229736 .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
+${OBJECTDIR}/flash/flash.o: flash/flash.c  .generated_files/flags/default/9d3b5d725f115de5faf571e13c8920fe181965d .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
 	@${MKDIR} "${OBJECTDIR}/flash" 
-	@${RM} ${OBJECTDIR}/flash/NVMem.o.d 
-	@${RM} ${OBJECTDIR}/flash/NVMem.o 
-	${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -Os -fno-common -MP -MMD -MF "${OBJECTDIR}/flash/NVMem.o.d" -o ${OBJECTDIR}/flash/NVMem.o flash/NVMem.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD)  -mdfp="${DFP_DIR}"  
+	@${RM} ${OBJECTDIR}/flash/flash.o.d 
+	@${RM} ${OBJECTDIR}/flash/flash.o 
+	${MP_CC}  $(MP_EXTRA_CC_PRE)  -g -x c -c -mprocessor=$(MP_PROCESSOR_OPTION)  -Os -fno-common -MP -MMD -MF "${OBJECTDIR}/flash/flash.o.d" -o ${OBJECTDIR}/flash/flash.o flash/flash.c    -DXPRJ_default=$(CND_CONF)    $(COMPARISON_BUILD)  -mdfp="${DFP_DIR}"  
 	
 endif
 

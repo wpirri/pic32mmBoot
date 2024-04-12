@@ -86,7 +86,7 @@ PROVIDE(_ebase_address = 0x9D005000);
 _RESET_ADDR                    = 0x9D006000;
 _BEV_EXCPT_ADDR                = 0x9D006380;
 _DBG_EXCPT_ADDR                = 0x9D006480;
-_DBG_CODE_ADDR                 = 0x9D006490;
+_DBG_CODE_ADDR                 = 0x9FC00490;
 _DBG_CODE_SIZE                 = 0x760;
 _SIMPLE_TLB_REFILL_EXCPT_ADDR  = _ebase_address + 0;
 _GEN_EXCPT_ADDR                = _ebase_address + 0x180;
@@ -108,8 +108,8 @@ _GEN_EXCPT_ADDR                = _ebase_address + 0x180;
 MEMORY
 {
   kseg0_program_mem     (rx)  : ORIGIN = 0x9D006490, LENGTH = 0x39B70
-  debug_exec_mem              : ORIGIN = 0x9D005000, LENGTH = 0x0
-  kseg0_boot_mem              : ORIGIN = 0x9D005000, LENGTH = 0x1000
+  debug_exec_mem              : ORIGIN = 0x9D005000, LENGTH = 0x1000
+  kseg0_boot_mem              : ORIGIN = 0x9D005000, LENGTH = 0x0
   kseg1_boot_mem              : ORIGIN = 0x9D006000, LENGTH = 0x490
   config_BFC01744             : ORIGIN = 0xBFC01744, LENGTH = 0x4
   config_BFC01748             : ORIGIN = 0xBFC01748, LENGTH = 0x4

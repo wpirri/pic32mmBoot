@@ -22,7 +22,7 @@
 #include <string.h>
 
 #include "sd/fsio.h"
-#include "flash/NVMem.h"
+#include "flash/flash.h"
 
 /*
  RA0    Led status  (azul)
@@ -79,6 +79,18 @@
 #define PROGRAM_FILE_NAME_BK    "pgmbk.hex"
 #define VERIFY_PROGRAM
 
+/* 
+ * Translate a kernel address in KSEG0 or KSEG1 to a real
+ * physical address and back.
+ */
+#define KVA_TO_PA(v) 	((v) & 0x1fffffff)
+#define PA_TO_KVA0(pa)	((pa) | 0x80000000)
+#define PA_TO_KVA1(pa)	((pa) | 0xa0000000)
+
+/* translate between KSEG0 and KSEG1 addresses */
+#define KVA0_TO_KVA1(v)	((v) | 0x20000000)
+#define KVA1_TO_KVA0(v)	((v) & ~0x20000000)
+
 /******************************************************************************
 Macros used in this file
 *******************************************************************************/
@@ -99,7 +111,7 @@ Macros used in this file
  		2)The base address and end address must align on  4K address boundary */
 
 #define APP_FLASH_BASE_ADDRESS 	0x9D005000
-#define APP_FLASH_END_ADDRESS   0x9D003FFF
+#define APP_FLASH_END_ADDRESS   0x9D03FFFF
 
 /* Address of  the Flash from where the application starts executing */
 /* Rule: Set APP_FLASH_BASE_ADDRESS to _RESET_ADDR value of application linker script*/
@@ -160,6 +172,7 @@ void Error( unsigned int err );
 /*****************************************************************************/
 int main(void)
 {
+    volatile unsigned long before_run_delay_count;
     volatile UINT i;
     g_boot_file = NULL;
     long bytecount;
@@ -373,6 +386,8 @@ int main(void)
 
     }
 
+    STATUS_LED = 0;
+
     /* Si el HEX no sirve */
     if(validHex == 0)
     {
@@ -396,6 +411,8 @@ int main(void)
     // Erase Flash (Block Erase the program Flash)
     EraseFlash();
 
+    MODE_LED = 0;
+    
     /* Un parche de reintentos para salvar errores de lectura de las SD */
     bytecount = 0;
     readretry = READ_RETRY;
@@ -413,10 +430,20 @@ int main(void)
             if(WriteHexRecord2Flash(g_hex_rec))
             {
                 /* Cuando encuentra el registro final sale con 1 */
-                STATUS_LED = 0;
-                MODE_LED = 0;
+                STATUS_LED = 1;
+                MODE_LED = 1;
                 AUX_LED = 0;
-                JumpToApp();
+
+                for(before_run_delay_count = 10000000; before_run_delay_count > 0; before_run_delay_count--);
+
+                if(ValidAppPresent())
+                {
+                    JumpToApp();
+                }
+                else
+                {
+                    Error(8);
+                }
             }
             // Blink LED
             BlinkLed(300);
@@ -617,20 +644,20 @@ void ConvertAsciiToHex(UINT8* asciiRec, UINT8* hexRec)
 ********************************************************************/
 void EraseFlash(void)
 {
-	void * pFlash;
+	uint32_t pFlash;
     UINT result;
     INT i;
 
-    pFlash = (void*)APP_FLASH_BASE_ADDRESS;									
+    pFlash = (uint32_t)APP_FLASH_BASE_ADDRESS;									
     for( i = 0; i < ((APP_FLASH_END_ADDRESS - APP_FLASH_BASE_ADDRESS + 1)/FLASH_PAGE_SIZE); i++ )
     {
-	     result = NVMemErasePage( pFlash + (i*FLASH_PAGE_SIZE) );
+	     result = FLASH_ErasePage( pFlash + (i*FLASH_PAGE_SIZE) );
         // Assert on NV error. This must be caught during debug phase.
 
         if(result != 0)
         {
            // We have a problem. This must be caught during the debug phase.
-            while(1);
+            Error(7);
         } 
         // Blink LED to indicate erase is in progress.
         BlinkLed(10);
@@ -658,9 +685,10 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
     static T_HEX_RECORD HexRecordSt;
     UINT8 Checksum = 0;
     UINT8 i;
-    UINT WrData;
+    UINT WrData0;
+    UINT WrData1;
     UINT RdData;
-    void* ProgAddress;
+    uint32_t ProgAddress;
     UINT result;
 
     HexRecordSt.RecDataLen = HexRecord[0];
@@ -694,24 +722,38 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
                 while(HexRecordSt.RecDataLen) // Loop till all bytes are done.
                 {
                     // Convert the Physical address to Virtual address.
-                    ProgAddress = (void *)PA_TO_KVA0(HexRecordSt.Address.Val);
+                    ProgAddress = (uint32_t)PA_TO_KVA0(HexRecordSt.Address.Val);
                     // Make sure we are not writing boot area and device configuration bits.
-                    if(((ProgAddress >= (void *)APP_FLASH_BASE_ADDRESS) && (ProgAddress <= (void *)APP_FLASH_END_ADDRESS))
-                       && ((ProgAddress < (void*)DEV_CONFIG_REG_BASE_ADDRESS) || (ProgAddress > (void*)DEV_CONFIG_REG_END_ADDRESS)))
+                    if(((ProgAddress >= (uint32_t)APP_FLASH_BASE_ADDRESS) && (ProgAddress <= (uint32_t)APP_FLASH_END_ADDRESS))
+                       && ((ProgAddress < (uint32_t)DEV_CONFIG_REG_BASE_ADDRESS) || (ProgAddress > (uint32_t)DEV_CONFIG_REG_END_ADDRESS)))
                     {
-                        if(HexRecordSt.RecDataLen < 4)
+                        if(HexRecordSt.RecDataLen < 8)
                         {
-                            // Sometimes record data length will not be in multiples of 4. Appending 0xFF will make sure that..
-                            // we don't write junk data in such cases.
-                            WrData = 0xFFFFFFFF;
-                            memcpy(&WrData, HexRecordSt.Data, HexRecordSt.RecDataLen);
+                            if(HexRecordSt.RecDataLen < 4)
+                            {
+                                // Sometimes record data length will not be in multiples of 4. Appending 0xFF will make sure that..
+                                // we don't write junk data in such cases.
+                                WrData1 = 0xFFFFFFFF;
+                                WrData0 = 0xFFFFFFFF;
+                                memcpy(&WrData1, HexRecordSt.Data, HexRecordSt.RecDataLen);
+                            }
+                            else
+                            {
+                                WrData1 = 0xFFFFFFFF;
+                                WrData0 = 0xFFFFFFFF;
+
+                                memcpy(&WrData1, HexRecordSt.Data, 4);
+                                memcpy(&WrData0, HexRecordSt.Data, HexRecordSt.RecDataLen-4);
+                            }
                         }
                         else
                         {
-                            memcpy(&WrData, HexRecordSt.Data, 4);
+                            memcpy(&WrData1, HexRecordSt.Data, 4);
+                            memcpy(&WrData0, HexRecordSt.Data+4, 4);
                         }
                         // Write the data into flash.
-                        result = NVMemWriteWord(ProgAddress, WrData);
+                        //result = NVMemWriteWord(ProgAddress, WrData);
+                        result = FLASH_WriteDoubleWord(ProgAddress, WrData0, WrData1 );
                         // Assert on error. This must be caught during debug phase.
                         if(result != 0)
                         {
@@ -719,13 +761,13 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
                         }
                     }
                     // Increment the address.
-                    HexRecordSt.Address.Val += 4;
+                    HexRecordSt.Address.Val += 8;
                     // Increment the data pointer.
-                    HexRecordSt.Data += 4;
+                    HexRecordSt.Data += 8;
                     // Decrement data len.
-                    if(HexRecordSt.RecDataLen > 3)
+                    if(HexRecordSt.RecDataLen > 7)
                     {
-                        HexRecordSt.RecDataLen -= 4;
+                        HexRecordSt.RecDataLen -= 8;
                     }
                     else
                     {

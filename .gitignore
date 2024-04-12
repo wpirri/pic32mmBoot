@@ -1,0 +1,5 @@
+
+/Programa/.generated_files
+*.o
+*.d
+/Programa/dist
