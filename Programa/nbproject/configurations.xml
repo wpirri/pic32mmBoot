@@ -21,6 +21,7 @@
                    displayName="Linker Files"
                    projectFiles="true">
       <itemPath>boot_p32MM0256GPM028.ld</itemPath>
+      <itemPath>app_p32MM0256GPM028.ld</itemPath>
     </logicalFolder>
     <logicalFolder name="SourceFiles"
                    displayName="Source Files"
@@ -333,6 +334,7 @@
         <property key="event.recorder.debugger.behavior" value="Running"/>
         <property key="event.recorder.enabled" value="false"/>
         <property key="event.recorder.scvd.files" value=""/>
+        <property key="firmware.download.all" value="false"/>
         <property key="hwtoolclock.frcindebug" value="false"/>
         <property key="lastid" value=""/>
         <property key="memories.aux" value="false"/>
@@ -368,6 +370,8 @@
         <property key="programoptions.uselvpprogramming" value="false"/>
         <property key="voltagevalue" value="3.25"/>
       </Tool>
+      <item path="app_p32MM0256GPM028.ld" ex="true" overriding="false">
+      </item>
     </conf>
   </confs>
 </configurationDescriptor>

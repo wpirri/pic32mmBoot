@@ -157,6 +157,8 @@ unsigned int    g_led_count;
 UINT8 g_ascii_buffer[80];
 UINT8 g_hex_rec[100];
 
+char* g_buffer[256];
+
 void JumpToApp(void);
 BOOL ValidAppPresent(void);
 void EraseFlash(void);
@@ -166,6 +168,7 @@ void ConvertAsciiToHex(UINT8* asciiRec, UINT8* hexRec);
 int readLine(void *ptr, size_t max_len, FSFILE *stream);
 void BlinkLed(unsigned int period);
 void Error( unsigned int err );
+void Log(const char* msg);
 
 
 
@@ -233,6 +236,8 @@ int main(void)
     SYSKEY = 0x556699AA; //write Key2 to SYSKEY
     // unlock PPS
     RPCONbits.IOLOCK = 0;
+    RPOR0bits.RP4R = 0x0004;    //RA3->UART2:U2TX
+    RPINR9bits.U2RXR = 0x0000;    //RA2->NADA - ( 0x0003 RA2->UART2:U2RX )
     /* Agregado para mapeo de SPI */
     RPOR1bits.RP6R = 0x0008;        //RB0->SPI2:SDO2
     RPINR11bits.SDI2R = 0x0007;     //RB1->SPI2:SDI2
@@ -290,7 +295,21 @@ int main(void)
     // Enable RTCC 
     RTCCON1SET = (1 << _RTCCON1_ON_POSITION);
     RTCCON1SET = (1 << _RTCCON1_WRLOCK_POSITION);
-
+/* ************************************************************************** */
+/* UART2 */
+   IEC1bits.U2TXIE = 0;
+   IEC1bits.U2RXIE = 0;
+   // STSEL 1; PDSEL 8N; RTSMD disabled; OVFDIS disabled; ACTIVE disabled; RXINV disabled; WAKE disabled; BRGH enabled; IREN disabled; ON enabled; SLPEN disabled; SIDL disabled; ABAUD disabled; LPBACK disabled; UEN TX_RX; CLKSEL PBCLK; 
+   U2MODE = (0x8008 & ~(1<<15));  // disabling UART
+   // UTXISEL TX_ONE_CHAR; UTXINV disabled; ADDR 0; MASK 0; URXEN disabled; OERR disabled; URXISEL RX_ONE_CHAR; UTXBRK disabled; UTXEN disabled; ADDEN disabled; 
+   U2STA = 0x0;
+   // BaudRate = 115200; Frequency = 24000000 Hz; BRG 51; 
+   U2BRG = 0x33;
+    //Make sure to set LAT bit corresponding to TxPin as high before UART initialization
+   U2STASET = _U2STA_UTXEN_MASK;
+   U2MODESET = _U2MODE_ON_MASK;  // enabling UART ON bit
+   U2STASET = _U2STA_URXEN_MASK; 
+/* ************************************************************************** */
     // System Reg Lock
     SYSKEY = 0x00000000; 
 /* ************************************************************************** */
@@ -306,17 +325,22 @@ int main(void)
     
     g_led_count = 0;
 
+    Log("PIC32MM0256 Boot Loader Init Ok\n");
+            
     // Initialize the File System
     if(!FSInit())
     {
+        Log("No se pudo montar la terjeta SD\n");
         /* Si no puedo iniciaizar la SD trato de saltar al programa */
         if(ValidAppPresent())
         {
+            Log("Iniciando programa previamente cargado\n");
             JumpToApp();
         }
         else
         {
             //Indicate error and stay in while loop.
+            Log("No hay programa cargado\n");
             Error(1);
         }
     }         
@@ -328,8 +352,10 @@ int main(void)
 
     if(g_boot_file == NULL)// Make sure the file is present.
     {
+        Log("La tarjeta SD no tiene PGM.HEX\n");
         if(ValidAppPresent())
         {
+            Log("Iniciando programa previamente cargado\n");
             JumpToApp();
         }
         else
@@ -339,15 +365,18 @@ int main(void)
 
             if(g_boot_file == NULL)// Make sure the file is present.
             {
+                Log("La tarjeta SD no tiene PGMBK.HEX\n");
                 //Indicate error and stay in while loop.
                 Error(2);
             }
         }
     }     
 
+    Log("PGM.HEX encontrado\n");
     MODE_LED = 1;
 
 #ifdef VERIFY_PROGRAM
+    Log("Verificando archivo PGM.HEX\n");
     /* Verifico el archivo HEX */
     bytecount = 0;
     readretry = READ_RETRY;
@@ -391,12 +420,15 @@ int main(void)
     /* Si el HEX no sirve */
     if(validHex == 0)
     {
+        Log("Archivo PGM.HEX invalido\n");
         if(ValidAppPresent())
         {
+            Log("Iniciando programa previamente cargado\n");
             JumpToApp();
         }
         else
         {
+            Log("No hay programa cargado\n");
             //Indicate error and stay in while loop.
             Error(3);
         }
@@ -404,10 +436,14 @@ int main(void)
 
     /* Cierro el archivo */
     FSfclose(g_boot_file);
+    Log("PGM.HEX verificado\n");
     /* Lo vuelvo a abrir */
     g_boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
     if( !g_boot_file) g_boot_file = FSfopen(PROGRAM_FILE_NAME_BK, "r");
 #endif /* VERIFY_PROGRAM */
+
+    FLASH_Unlock(FLASH_UNLOCK_KEY);
+
     // Erase Flash (Block Erase the program Flash)
     EraseFlash();
 
@@ -434,6 +470,8 @@ int main(void)
                 MODE_LED = 1;
                 AUX_LED = 0;
 
+                Log("Fin de carga de programa. Iniciando...\n");
+                
                 for(before_run_delay_count = 10000000; before_run_delay_count > 0; before_run_delay_count--);
 
                 if(ValidAppPresent())
@@ -442,6 +480,7 @@ int main(void)
                 }
                 else
                 {
+                    Log("No hay programa cargado\n");
                     Error(8);
                 }
             }
@@ -465,6 +504,7 @@ int main(void)
     }
     /* Si pasa por ac? es un error en el archivo HEX */
     FSfclose(g_boot_file);
+    Log("El bootloader termino sin cargar programa\n");
     Error(4);
     return 0;
 }
@@ -645,18 +685,16 @@ void ConvertAsciiToHex(UINT8* asciiRec, UINT8* hexRec)
 void EraseFlash(void)
 {
 	uint32_t pFlash;
-    UINT result;
     INT i;
 
     pFlash = (uint32_t)APP_FLASH_BASE_ADDRESS;									
     for( i = 0; i < ((APP_FLASH_END_ADDRESS - APP_FLASH_BASE_ADDRESS + 1)/FLASH_PAGE_SIZE); i++ )
     {
-	     result = FLASH_ErasePage( pFlash + (i*FLASH_PAGE_SIZE) );
         // Assert on NV error. This must be caught during debug phase.
-
-        if(result != 0)
+        if( !FLASH_ErasePage( pFlash + (i*FLASH_PAGE_SIZE) ))
         {
            // We have a problem. This must be caught during the debug phase.
+            Log("Error al blanquear memoria de programa");
             Error(7);
         } 
         // Blink LED to indicate erase is in progress.
@@ -689,7 +727,6 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
     UINT WrData1;
     UINT RdData;
     uint32_t ProgAddress;
-    UINT result;
 
     HexRecordSt.RecDataLen = HexRecord[0];
     HexRecordSt.RecType = HexRecord[3];
@@ -705,6 +742,7 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
     {
         //Error. Hex record Checksum mismatch.
         //Indicate Error by switching ON all LEDs.
+        Log("Error de checrum en archivo HEX\n");
         Error(5);
     }
     else
@@ -743,7 +781,7 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
                                 WrData0 = 0xFFFFFFFF;
 
                                 memcpy(&WrData1, HexRecordSt.Data, 4);
-                                memcpy(&WrData0, HexRecordSt.Data, HexRecordSt.RecDataLen-4);
+                                memcpy(&WrData0, HexRecordSt.Data+4, HexRecordSt.RecDataLen-4);
                             }
                         }
                         else
@@ -752,11 +790,10 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
                             memcpy(&WrData0, HexRecordSt.Data+4, 4);
                         }
                         // Write the data into flash.
-                        //result = NVMemWriteWord(ProgAddress, WrData);
-                        result = FLASH_WriteDoubleWord(ProgAddress, WrData0, WrData1 );
                         // Assert on error. This must be caught during debug phase.
-                        if(result != 0)
+                        if( !FLASH_WriteDoubleWord(ProgAddress, WrData0, WrData1 ))
                         {
+                            Log("Error al escribir programa\n");
                             Error(6);
                         }
                     }
@@ -953,4 +990,13 @@ int CheckHexRecord(UINT8* HexRecord)
     }
     /* Le falta el record final */
     return 0;
+}
+
+void Log(const char* msg)
+{
+    while(*msg)
+    {
+        while(U2STAbits.UTXBF);
+        U2TXREG = *msg++;
+    }
 }
