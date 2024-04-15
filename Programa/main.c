@@ -24,6 +24,8 @@
 #include "sd/fsio.h"
 #include "flash/flash.h"
 
+#define NO__DEBUG__
+
 /*
  RA0    Led status  (azul)
  RA1    Led modo    (verde)
@@ -110,7 +112,7 @@ Macros used in this file
 
  		2)The base address and end address must align on  4K address boundary */
 
-#define APP_FLASH_BASE_ADDRESS 	0x9D005000
+#define APP_FLASH_BASE_ADDRESS 	0x9D006000
 #define APP_FLASH_END_ADDRESS   0x9D03FFFF
 
 /* Address of  the Flash from where the application starts executing */
@@ -175,7 +177,6 @@ void Log(const char* msg);
 /*****************************************************************************/
 int main(void)
 {
-    volatile unsigned long before_run_delay_count;
     volatile UINT i;
     g_boot_file = NULL;
     long bytecount;
@@ -466,14 +467,7 @@ int main(void)
             if(WriteHexRecord2Flash(g_hex_rec))
             {
                 /* Cuando encuentra el registro final sale con 1 */
-                STATUS_LED = 1;
-                MODE_LED = 1;
-                AUX_LED = 0;
-
-                Log("Fin de carga de programa. Iniciando...\n");
-                
-                for(before_run_delay_count = 10000000; before_run_delay_count > 0; before_run_delay_count--);
-
+                Log("Fin de carga de programa\n");
                 if(ValidAppPresent())
                 {
                     JumpToApp();
@@ -580,6 +574,15 @@ void __attribute__((optimize("-O0"))) Error( unsigned int err )
 ********************************************************************/
 void JumpToApp(void)
 {
+    volatile unsigned long before_run_delay_count;
+
+    STATUS_LED = 1;
+    MODE_LED = 1;
+    AUX_LED = 0;
+
+    Log("Iniciando...\n");
+
+    for(before_run_delay_count = 10000000; before_run_delay_count > 0; before_run_delay_count--);
 #ifdef ALLOW_WRITES
     int bkp = 0;
     char backup_name[TOTAL_FILE_SIZE+1];
@@ -603,6 +606,7 @@ void JumpToApp(void)
 #endif /* ALLOW_WRITES */
 
     /* Antes de saltar a la aplicacion deben estar todas las interrupciones inhabilitadas */
+    INTCONbits.MVEC = 1;
 
     /* Salto */
     void (*fptr)(void);
@@ -686,11 +690,16 @@ void EraseFlash(void)
 {
 	uint32_t pFlash;
     INT i;
+    char str[256];
 
     pFlash = (uint32_t)APP_FLASH_BASE_ADDRESS;									
     for( i = 0; i < ((APP_FLASH_END_ADDRESS - APP_FLASH_BASE_ADDRESS + 1)/FLASH_PAGE_SIZE); i++ )
     {
         // Assert on NV error. This must be caught during debug phase.
+#ifdef __DEBUG__
+        sprintf(str, "Flash Erase Address: 0x%X\n", ( pFlash + (i*FLASH_PAGE_SIZE)));
+        Log(str);
+#endif
         if( !FLASH_ErasePage( pFlash + (i*FLASH_PAGE_SIZE) ))
         {
            // We have a problem. This must be caught during the debug phase.
@@ -721,12 +730,12 @@ void EraseFlash(void)
 int WriteHexRecord2Flash(UINT8* HexRecord)
 {
     static T_HEX_RECORD HexRecordSt;
+    uint32_t WrData0;
+    uint32_t WrData1;
+    uint32_t ProgAddress;
     UINT8 Checksum = 0;
     UINT8 i;
-    UINT WrData0;
-    UINT WrData1;
-    UINT RdData;
-    uint32_t ProgAddress;
+    char str[256];
 
     HexRecordSt.RecDataLen = HexRecord[0];
     HexRecordSt.RecType = HexRecord[3];
@@ -742,7 +751,7 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
     {
         //Error. Hex record Checksum mismatch.
         //Indicate Error by switching ON all LEDs.
-        Log("Error de checrum en archivo HEX\n");
+        Log("Error de checksum en archivo HEX\n");
         Error(5);
     }
     else
@@ -765,46 +774,69 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
                     if(((ProgAddress >= (uint32_t)APP_FLASH_BASE_ADDRESS) && (ProgAddress <= (uint32_t)APP_FLASH_END_ADDRESS))
                        && ((ProgAddress < (uint32_t)DEV_CONFIG_REG_BASE_ADDRESS) || (ProgAddress > (uint32_t)DEV_CONFIG_REG_END_ADDRESS)))
                     {
-                        if(HexRecordSt.RecDataLen < 8)
+                        if(ProgAddress & 0x00000007)
                         {
+                            /* Second WORD */
+                            if(HexRecordSt.RecDataLen < 4)
+                            {
+                                // Sometimes record data length will not be in multiples of 4. Appending 0xFF will make sure that..
+                                // we don't write junk data in such cases.
+                                WrData0 = 0xFFFFFFFF;
+                                memcpy(&WrData0, HexRecordSt.Data, HexRecordSt.RecDataLen);
+                            }
+                            else
+                            {
+                                memcpy(&WrData0, HexRecordSt.Data, 4);
+                            }
+                            WrData1 = FLASH_ReadWord(ProgAddress - 0x04);
+                            // Write the data into flash.
+                            // Assert on error. This must be caught during debug phase.
+#ifdef __DEBUG__
+                            sprintf(str, "Flash Write Address: 0x%X Data: 0x%08X 0x%08X\n", ProgAddress, WrData1, WrData0);
+                            Log(str);
+#endif
+                            if( !FLASH_WriteDoubleWord(ProgAddress - 0x04, WrData1, WrData0 ))
+                            {
+                                Log("Error al escribir programa\n");
+                                Error(6);
+                            }
+                        }
+                        else
+                        {
+                            /* First WORD */
                             if(HexRecordSt.RecDataLen < 4)
                             {
                                 // Sometimes record data length will not be in multiples of 4. Appending 0xFF will make sure that..
                                 // we don't write junk data in such cases.
                                 WrData1 = 0xFFFFFFFF;
-                                WrData0 = 0xFFFFFFFF;
                                 memcpy(&WrData1, HexRecordSt.Data, HexRecordSt.RecDataLen);
                             }
                             else
                             {
-                                WrData1 = 0xFFFFFFFF;
-                                WrData0 = 0xFFFFFFFF;
-
                                 memcpy(&WrData1, HexRecordSt.Data, 4);
-                                memcpy(&WrData0, HexRecordSt.Data+4, HexRecordSt.RecDataLen-4);
                             }
-                        }
-                        else
-                        {
-                            memcpy(&WrData1, HexRecordSt.Data, 4);
-                            memcpy(&WrData0, HexRecordSt.Data+4, 4);
-                        }
-                        // Write the data into flash.
-                        // Assert on error. This must be caught during debug phase.
-                        if( !FLASH_WriteDoubleWord(ProgAddress, WrData0, WrData1 ))
-                        {
-                            Log("Error al escribir programa\n");
-                            Error(6);
+                            WrData0 = FLASH_ReadWord(ProgAddress + 0x04);
+                            // Write the data into flash.
+                            // Assert on error. This must be caught during debug phase.
+#ifdef __DEBUG__
+                            sprintf(str, "Flash Write Address: 0x%X Data: 0x%08X 0x%08X\n", ProgAddress, WrData1, WrData0);
+                            Log(str);
+#endif
+                            if( !FLASH_WriteDoubleWord(ProgAddress, WrData1, WrData0 ))
+                            {
+                                Log("Error al escribir programa\n");
+                                Error(6);
+                            }
                         }
                     }
                     // Increment the address.
-                    HexRecordSt.Address.Val += 8;
+                    HexRecordSt.Address.Val += 4;
                     // Increment the data pointer.
-                    HexRecordSt.Data += 8;
+                    HexRecordSt.Data += 4;
                     // Decrement data len.
-                    if(HexRecordSt.RecDataLen > 7)
+                    if(HexRecordSt.RecDataLen > 3)
                     {
-                        HexRecordSt.RecDataLen -= 8;
+                        HexRecordSt.RecDataLen -= 4;
                     }
                     else
                     {

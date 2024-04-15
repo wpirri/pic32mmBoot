@@ -71,7 +71,7 @@ OPTIONAL("processor.o")
  *   xc32-gcc src.c -Wl,--defsym=_ebase_address=0x9D001000
  *************************************************************************/
 PROVIDE(_vector_spacing = 0x0001);
-PROVIDE(_ebase_address = 0x9D005000);
+PROVIDE(_ebase_address = 0x9D006000);
 
 /*************************************************************************
  * Memory Address Equates
@@ -83,9 +83,9 @@ PROVIDE(_ebase_address = 0x9D005000);
  * _SIMPLE_TLB_REFILL_EXCPT_ADDR  -- Simple TLB-Refill Exception Vector
  * _GEN_EXCPT_ADDR                -- General Exception Vector
  *************************************************************************/
-_RESET_ADDR                    = 0x9D006000;
-_BEV_EXCPT_ADDR                = 0x9D006380;
-_DBG_EXCPT_ADDR                = 0x9D006480;
+_RESET_ADDR                    = 0x9D007000;
+_BEV_EXCPT_ADDR                = 0x9D007380;
+_DBG_EXCPT_ADDR                = 0x9D007480;
 _DBG_CODE_ADDR                 = 0x9FC00490;
 _DBG_CODE_SIZE                 = 0x760;
 _SIMPLE_TLB_REFILL_EXCPT_ADDR  = _ebase_address + 0;
@@ -107,10 +107,10 @@ _GEN_EXCPT_ADDR                = _ebase_address + 0x180;
 
 MEMORY
 {
-  kseg0_program_mem     (rx)  : ORIGIN = 0x9D006490, LENGTH = 0x39B70
-  debug_exec_mem              : ORIGIN = 0x9D005000, LENGTH = 0x1000
-  kseg0_boot_mem              : ORIGIN = 0x9D005000, LENGTH = 0x0
-  kseg1_boot_mem              : ORIGIN = 0x9D006000, LENGTH = 0x490
+  kseg0_program_mem     (rx)  : ORIGIN = 0x9D007490, LENGTH = 0x38B70
+  debug_exec_mem              : ORIGIN = 0x9D006000, LENGTH = 0x1000
+  kseg0_boot_mem              : ORIGIN = 0x9D006000, LENGTH = 0x0
+  kseg1_boot_mem              : ORIGIN = 0x9D007000, LENGTH = 0x490
   config_BFC01744             : ORIGIN = 0xBFC01744, LENGTH = 0x4
   config_BFC01748             : ORIGIN = 0xBFC01748, LENGTH = 0x4
   config_BFC0174C             : ORIGIN = 0xBFC0174C, LENGTH = 0x4
