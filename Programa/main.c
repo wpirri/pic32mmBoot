@@ -24,7 +24,13 @@
 #include "sd/fsio.h"
 #include "flash/flash.h"
 
-#define NO__DEBUG__
+#define __DEBUG__
+#define READ_RETRY 100
+#define VERIFY_PROGRAM
+
+#define PROGRAM_FILE_NAME       "pgm.hex"
+#define PROGRAM_FILE_NAME_BK    "pgmbk.hex"
+
 
 /*
  RA0    Led status  (azul)
@@ -73,13 +79,10 @@
 // FSEC
 #pragma config CP = OFF                 // Code Protection Enable bit (Code protection is disabled)
 /* ************************************************************************** */
+
 #define STATUS_LED      LATAbits.LATA0
 #define MODE_LED        LATAbits.LATA1
 #define AUX_LED         LATAbits.LATA4
-
-#define PROGRAM_FILE_NAME       "pgm.hex"
-#define PROGRAM_FILE_NAME_BK    "pgmbk.hex"
-#define VERIFY_PROGRAM
 
 /* 
  * Translate a kernel address in KSEG0 or KSEG1 to a real
@@ -93,6 +96,8 @@
 #define KVA0_TO_KVA1(v)	((v) | 0x20000000)
 #define KVA1_TO_KVA0(v)	((v) & ~0x20000000)
 
+#define WORD_ALIGN_MASK         (~(sizeof(uint32_t) - 1U))
+
 /******************************************************************************
 Macros used in this file
 *******************************************************************************/
@@ -104,6 +109,19 @@ Macros used in this file
 /* ************************************************************************** */
 /* Estos valores dependen de lo definido en el Linker Script                  */
 /* ************************************************************************** */
+/* Parámetros afectados en Linker file
+ * _ebase_address
+ * 
+ * _RESET_ADDR
+ * _BEV_EXCPT_ADDR
+ * _DBG_EXCPT_ADDR
+ * 
+ * kseg0_program_mem
+ * debug_exec_mem
+ * kseg0_boot_mem
+ * kseg1_boot_mem
+ * 
+ */
 /* APP_FLASH_BASE_ADDRESS and APP_FLASH_END_ADDRESS reserves program Flash for the application*/
 /* Rule:
  		1)The memory regions kseg0_program_mem, kseg0_boot_mem, exception_mem and
@@ -131,8 +149,6 @@ Macros used in this file
 #define EXT_SEG_ADRS_RECORD 2
 #define EXT_LIN_ADRS_RECORD 4
 
-#define READ_RETRY 100
-
 typedef struct
 {
     UINT8 *start;
@@ -158,10 +174,11 @@ unsigned int    g_led_count;
 
 UINT8 g_ascii_buffer[80];
 UINT8 g_hex_rec[100];
+volatile unsigned long before_run_delay_count;
 
 char* g_buffer[256];
 
-void JumpToApp(void);
+void JumpToApp( void );
 BOOL ValidAppPresent(void);
 void EraseFlash(void);
 int WriteHexRecord2Flash(UINT8* HexRecord);
@@ -183,9 +200,6 @@ int main(void)
     int byteread;
     int readretry;
     int validHex = 0;
-
-    INTCONbits.MVEC = 1;
-    asm volatile("ei $0");
 
 /* ************************************************************************** */
 /*  Setting the Output Latch SFR(s) */
@@ -314,17 +328,17 @@ int main(void)
     // System Reg Lock
     SYSKEY = 0x00000000; 
 /* ************************************************************************** */
-/* INTERRUPT Initialize */
-    // Enable Multi Vector Configuration
-    INTCONbits.MVEC = 1;
-/* ************************************************************************** */
-
-    
     TRISAbits.TRISA0 = 0;
     TRISAbits.TRISA1 = 0;
     TRISAbits.TRISA4 = 0;
     
     g_led_count = 0;
+/* ************************************************************************** */
+/* INTERRUPT Initialize */
+    // Enable Multi Vector Configuration
+    INTCONbits.MVEC = 1;
+    asm volatile("ei $0");
+/* ************************************************************************** */
 
     Log("PIC32MM0256 Boot Loader Init Ok\n");
             
@@ -450,6 +464,7 @@ int main(void)
 
     MODE_LED = 0;
     
+    Log("Cargando programa\n");
     /* Un parche de reintentos para salvar errores de lectura de las SD */
     bytecount = 0;
     readretry = READ_RETRY;
@@ -470,6 +485,7 @@ int main(void)
                 Log("Fin de carga de programa\n");
                 if(ValidAppPresent())
                 {
+                    Log("Iniciando programa cargado\n");
                     JumpToApp();
                 }
                 else
@@ -550,7 +566,7 @@ void __attribute__((optimize("-O0"))) Error( unsigned int err )
 }
 
 /********************************************************************
-* Function: 	JumpToApp()
+* Function: 	JumpToApp( void )
 *
 * Precondition: 
 *
@@ -562,57 +578,24 @@ void __attribute__((optimize("-O0"))) Error( unsigned int err )
 *
 * Overview: 	Jumps to application.
 *
-*			
-* Note:		 	None.
-* void JumpToApp(void)
- * {
- *  // Cargar la dirección de inicio de la aplicación en el registro t9
- *  asm volatile ("lui t9, 0x2000");   
- *  // Saltar a la dirección de inicio de la aplicación
- *  asm volatile ("jr t9");            
- * }
 ********************************************************************/
-void JumpToApp(void)
+void JumpToApp( void )
 {
-    volatile unsigned long before_run_delay_count;
-
     STATUS_LED = 1;
     MODE_LED = 1;
     AUX_LED = 0;
 
-    Log("Iniciando...\n");
-
-    for(before_run_delay_count = 10000000; before_run_delay_count > 0; before_run_delay_count--);
-#ifdef ALLOW_WRITES
-    int bkp = 0;
-    char backup_name[TOTAL_FILE_SIZE+1];
-
-    /* Reenombro el archivo del programa para no cargarlo de nuevo */
-    strcpy(backup_name, PROGRAM_FILE_NAME);
-    if(g_boot_file)
-    {
-        while(bkp < 1000)
-        {
-            sprintf( (char*)(strchr(backup_name, '.')+1), "%03i", bkp );
-            if(FSrename(backup_name, g_boot_file) == 0) break;
-            bkp++;
-        }
-        if(bkp == 1000)
-        {
-            FSfclose(g_boot_file);
-            FSremove(PROGRAM_FILE_NAME);
-        }
-    }
-#endif /* ALLOW_WRITES */
-
-    /* Antes de saltar a la aplicacion deben estar todas las interrupciones inhabilitadas */
-    INTCONbits.MVEC = 1;
-
-    /* Salto */
     void (*fptr)(void);
+
     fptr = (void (*)(void))USER_APP_RESET_ADDRESS;
-    fptr();
-}	
+
+    Log("Iniciando...\n");
+    for(before_run_delay_count = 10000000; before_run_delay_count > 0; before_run_delay_count--);
+
+    __builtin_disable_interrupts();
+
+    /*fptr();*/ while(1);
+}
 
 /********************************************************************
 * Function: 	ConvertAsciiToHex()
@@ -692,6 +675,7 @@ void EraseFlash(void)
     INT i;
     char str[256];
 
+    Log("Blanqueando area de programa\n");
     pFlash = (uint32_t)APP_FLASH_BASE_ADDRESS;									
     for( i = 0; i < ((APP_FLASH_END_ADDRESS - APP_FLASH_BASE_ADDRESS + 1)/FLASH_PAGE_SIZE); i++ )
     {
@@ -781,25 +765,15 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
                             {
                                 // Sometimes record data length will not be in multiples of 4. Appending 0xFF will make sure that..
                                 // we don't write junk data in such cases.
-                                WrData0 = 0xFFFFFFFF;
-                                memcpy(&WrData0, HexRecordSt.Data, HexRecordSt.RecDataLen);
+                                WrData1 = 0xFFFFFFFF;
+                                memcpy(&WrData1, HexRecordSt.Data, HexRecordSt.RecDataLen);
                             }
                             else
                             {
-                                memcpy(&WrData0, HexRecordSt.Data, 4);
+                                memcpy(&WrData1, HexRecordSt.Data, 4);
                             }
-                            WrData1 = FLASH_ReadWord(ProgAddress - 0x04);
-                            // Write the data into flash.
-                            // Assert on error. This must be caught during debug phase.
-#ifdef __DEBUG__
-                            sprintf(str, "Flash Write Address: 0x%X Data: 0x%08X 0x%08X\n", ProgAddress, WrData1, WrData0);
-                            Log(str);
-#endif
-                            if( !FLASH_WriteDoubleWord(ProgAddress - 0x04, WrData1, WrData0 ))
-                            {
-                                Log("Error al escribir programa\n");
-                                Error(6);
-                            }
+                            WrData0 = FLASH_ReadWord(ProgAddress - 4);
+                            ProgAddress -= 4;
                         }
                         else
                         {
@@ -808,25 +782,25 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
                             {
                                 // Sometimes record data length will not be in multiples of 4. Appending 0xFF will make sure that..
                                 // we don't write junk data in such cases.
-                                WrData1 = 0xFFFFFFFF;
-                                memcpy(&WrData1, HexRecordSt.Data, HexRecordSt.RecDataLen);
+                                WrData0 = 0xFFFFFFFF;
+                                memcpy(&WrData0, HexRecordSt.Data, HexRecordSt.RecDataLen);
                             }
                             else
                             {
-                                memcpy(&WrData1, HexRecordSt.Data, 4);
+                                memcpy(&WrData0, HexRecordSt.Data, 4);
                             }
-                            WrData0 = FLASH_ReadWord(ProgAddress + 0x04);
-                            // Write the data into flash.
-                            // Assert on error. This must be caught during debug phase.
+                            WrData1 = FLASH_ReadWord(ProgAddress + 4);
+                        }
+                        // Write the data into flash.
+                        // Assert on error. This must be caught during debug phase.
 #ifdef __DEBUG__
-                            sprintf(str, "Flash Write Address: 0x%X Data: 0x%08X 0x%08X\n", ProgAddress, WrData1, WrData0);
-                            Log(str);
+                        sprintf(str, "Flash Write Address: 0x%X Data0: 0x%08X Data1: 0x%08X\n", ProgAddress, WrData0, WrData1);
+                        Log(str);
 #endif
-                            if( !FLASH_WriteDoubleWord(ProgAddress, WrData1, WrData0 ))
-                            {
-                                Log("Error al escribir programa\n");
-                                Error(6);
-                            }
+                        if( !FLASH_WriteDoubleWord(ProgAddress, WrData0, WrData1 ))
+                        {
+                            Log("Error al escribir programa\n");
+                            Error(6);
                         }
                     }
                     // Increment the address.
@@ -895,9 +869,7 @@ BOOL ValidAppPresent(void)
 {
 	volatile UINT32 *AppPtr;
 	
-	AppPtr = (UINT32*)USER_APP_RESET_ADDRESS;
-
-	if(*AppPtr == 0xFFFFFFFF)
+	if(FLASH_ReadWord(USER_APP_RESET_ADDRESS) == 0xFFFFFFFF)
 	{
 		return FALSE;
 	}
