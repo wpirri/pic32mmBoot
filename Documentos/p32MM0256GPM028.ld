@@ -1,8 +1,8 @@
 /*--------------------------------------------------------------------------
  * MPLAB XC Compiler -  PIC32MM0256GPM028 linker script
- * Build date : Aug 27 2021
+ * Build date : Jul 28 2020
  * 
- * Copyright (c) 2021, Microchip Technology Inc. and its subsidiaries ("Microchip")
+ * Copyright (c) 2020, Microchip Technology Inc. and its subsidiaries ("Microchip")
  * All rights reserved.
  * 
  * This software is developed by Microchip Technology Inc. and its
@@ -71,7 +71,7 @@ OPTIONAL("processor.o")
  *   xc32-gcc src.c -Wl,--defsym=_ebase_address=0x9D001000
  *************************************************************************/
 PROVIDE(_vector_spacing = 0x0001);
-PROVIDE(_ebase_address = 0x9FC01000);
+PROVIDE(_ebase_address = 0x9D000000);
 
 /*************************************************************************
  * Memory Address Equates
@@ -107,7 +107,7 @@ _GEN_EXCPT_ADDR                = _ebase_address + 0x180;
 
 MEMORY
 {
-  kseg0_program_mem     (rx)  : ORIGIN = 0x9D000000, LENGTH = 0x6000
+  kseg0_program_mem     (rx)  : ORIGIN = 0x9D000000, LENGTH = 0x40000
   debug_exec_mem              : ORIGIN = 0x9FC00490, LENGTH = 0x760
   kseg0_boot_mem              : ORIGIN = 0x9FC00490, LENGTH = 0x0
   kseg1_boot_mem              : ORIGIN = 0xBFC00000, LENGTH = 0x490
