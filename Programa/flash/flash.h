@@ -43,21 +43,7 @@
 #define FLASH_WRITE_ROW_SIZE_IN_PC_UNITS (FLASH_WRITE_ROW_SIZE_IN_INSTRUCTIONS*4)
 #define FLASH_ERASE_PAGE_SIZE_IN_PC_UNITS  (FLASH_ERASE_PAGE_SIZE_IN_INSTRUCTIONS*4)
 
-
 #define FLASH_ERASE_PAGE_MASK    (~((FLASH_ERASE_PAGE_SIZE_IN_PC_UNITS) - 1)) 
-
-
-#define FLASH_UNLOCK_KEY 0xAA996655
-
-
-
-/* FLASH_Unlock:   Updated the keys used to operate on the flash.  Refer to user documentation for correct keys
- *                   */
-void     FLASH_Unlock(uint32_t  key);
-
-/* FLASH_Lock:   Erases the keys used for flash operation in memory.
- *                   */
-void     FLASH_Lock(void);
 
 /* FLASH_ErasePage:   Erases a single page of flash.
  *       Parameter address:  Address of the page, must be page aligned.

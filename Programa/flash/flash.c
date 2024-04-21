@@ -21,20 +21,27 @@
 */
 
 
-#include <stdint.h>
 #include "xc.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+
 #include "flash.h"
+#include "../log.h"
 
 #define PHYS_ADDR(x)  (x & 0x1FFFFFFF)
-#define FLASH_UPPER_ADDRESS 0x1FFFFFFF
 
-static uint32_t FlashKeys[2];
- 
-void FLASH_Unlock(uint32_t  key)
+#define PH_FLASH_BASE_ADDRESS 	0x1D006000
+#define PH_FLASH_END_ADDRESS    0x1D03FFFF
+#define FLASH_UPPER_ADDRESS     PH_FLASH_END_ADDRESS
+
+void delay_us(unsigned int us)
 {
-    FlashKeys[0] = key;
-    FlashKeys[1] = ~key;
-}
+    us *= 10;
+    while (us--) _nop();
+}  
 
 static uint32_t FLASH_NVMUnlock(uint32_t operation)
 {
@@ -46,9 +53,13 @@ static uint32_t FLASH_NVMUnlock(uint32_t operation)
     // Flash operation to perform
     NVMCON = operation;
 
+    // Data sheet prescribes 6us delay for LVD to become stable.
+    // To be on the safer side, we shall set 7us delay.
+    delay_us(7);
+
     // Write Keys
-    NVMKEY = FlashKeys[0];
-    NVMKEY = FlashKeys[1];
+    NVMKEY = 0xAA996655;
+    NVMKEY = 0x556699AA;
 
     // Start the operation using the Set Register
     NVMCONSET = 0x8000;
@@ -73,15 +84,8 @@ static uint32_t FLASH_NVMUnlock(uint32_t operation)
 
     // Return WRERR and LVDERR Error Status Bits}
     return (NVMCON & 0x3000);
- }
-    
-
-void FLASH_Lock(void)
-{
-    FlashKeys[0] = 0x0;
-    FlashKeys[1] = 0x0;
 }
-
+    
 bool FLASH_ClearError()
 {
     bool res;
@@ -99,22 +103,30 @@ bool FLASH_ClearError()
 
 bool FLASH_ErasePage(uint32_t address)
 {
-    unsigned int res;
+    uint32_t phaddr = PHYS_ADDR(address);
+
+    char str[256];
+    sprintf(str, "[FLASH_ErasePage] PH: 0x%X\n", phaddr);
+    Log(str);
 
     // Make sure request is page aligned.
     if ( (address & ((FLASH_ERASE_PAGE_SIZE_IN_PC_UNITS)-1)) != 0 )
     {
-        return 0;
+        Log("[FLASH_ErasePage] Address Error\n");
+        return false;
     }
     
     // Set NVMADDR to the Start Address of page to erase
-    NVMADDR = (unsigned int) PHYS_ADDR(address);
+    NVMADDR = phaddr;
     
     // Unlock and Erase Page
-    res = FLASH_NVMUnlock(ERASE_PAGE_CODE);
+    if(FLASH_NVMUnlock(ERASE_PAGE_CODE))
+    {
+        Log("[FLASH_ErasePage] Page Erase Error\n");
+        return false;
+    }
     
-    // Return Result
-    return (res == 0);
+    return true;
 }
 
 
@@ -126,27 +138,33 @@ uint32_t FLASH_ReadWord(uint32_t address)
 
 bool FLASH_WriteDoubleWord(uint32_t flashAddress, uint32_t Data0, uint32_t Data1  )
 {
-    unsigned int res;
+    uint32_t phaddr = PHYS_ADDR(flashAddress);
+
+    char str[256];
+    sprintf(str, "[FLASH_WriteDoubleWord] PH: 0x%X Data0 0x%08X Data1 0x%08X\n", phaddr, Data0, Data1);
+    Log(str);
 
     // if address is not aligned, return.
-    if (   ((PHYS_ADDR(flashAddress) & 0x7) != 0) 
-        ||  (PHYS_ADDR(flashAddress) > FLASH_UPPER_ADDRESS) )
+    if (  (phaddr & 0x7) || phaddr < PH_FLASH_BASE_ADDRESS || phaddr > PH_FLASH_END_ADDRESS )
     {
+        Log("[FLASH_WriteDoubleWord] Address Error\n");
         return false;
     }
-
+    
     // Load data into NVMDATA register
     NVMDATA0 = Data0;
     NVMDATA1 = Data1;
-    
     // Load address to program into NVMADDR register
-    NVMADDR = (unsigned int) PHYS_ADDR(flashAddress);
+    NVMADDR = phaddr;
 
     // Unlock and Write Word
-    res = FLASH_NVMUnlock (WRITE_DWORD_CODE);
+    if(FLASH_NVMUnlock (WRITE_DWORD_CODE))
+    {
+        Log("[FLASH_WriteDoubleWord] Write Error\n");
+        return false;
+    }
 
-    // Return Result
-    return (res == 0);
+    return true;
 }
 
 /* FLASH_WriteRow: Writes a single row of data from the location given in *data to
