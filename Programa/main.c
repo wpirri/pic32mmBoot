@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "log.h"
 #include "sd/fsio.h"
 #include "flash/flash.h"
 
@@ -28,8 +29,8 @@
 #define READ_RETRY 100
 #define VERIFY_PROGRAM
 
-#define PROGRAM_FILE_NAME       "pgm.hex"
-#define PROGRAM_FILE_NAME_BK    "pgmbk.hex"
+#define PROGRAM_FILE_NAME       "PGM.HEX"
+#define PROGRAM_FILE_NAME_BK    "PGMBK.HEX"
 
 
 /*
@@ -194,7 +195,6 @@ void Log(const char* msg);
 /*****************************************************************************/
 int main(void)
 {
-    volatile UINT i;
     g_boot_file = NULL;
     long bytecount;
     int byteread;
@@ -340,6 +340,7 @@ int main(void)
     asm volatile("ei $0");
 /* ************************************************************************** */
 
+    LogInit();
     Log("PIC32MM0256 Boot Loader Init Ok\n");
             
     // Initialize the File System
@@ -456,8 +457,6 @@ int main(void)
     g_boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
     if( !g_boot_file) g_boot_file = FSfopen(PROGRAM_FILE_NAME_BK, "r");
 #endif /* VERIFY_PROGRAM */
-
-    FLASH_Unlock(FLASH_UNLOCK_KEY);
 
     // Erase Flash (Block Erase the program Flash)
     EraseFlash();
@@ -585,6 +584,8 @@ void JumpToApp( void )
     MODE_LED = 1;
     AUX_LED = 0;
 
+    while(1);
+    
     void (*fptr)(void);
 
     fptr = (void (*)(void))USER_APP_RESET_ADDRESS;
@@ -594,7 +595,7 @@ void JumpToApp( void )
 
     __builtin_disable_interrupts();
 
-    /*fptr();*/ while(1);
+    fptr();
 }
 
 /********************************************************************
@@ -719,7 +720,6 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
     uint32_t ProgAddress;
     UINT8 Checksum = 0;
     UINT8 i;
-    char str[256];
 
     HexRecordSt.RecDataLen = HexRecord[0];
     HexRecordSt.RecType = HexRecord[3];
@@ -793,10 +793,6 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
                         }
                         // Write the data into flash.
                         // Assert on error. This must be caught during debug phase.
-#ifdef __DEBUG__
-                        sprintf(str, "Flash Write Address: 0x%X Data0: 0x%08X Data1: 0x%08X\n", ProgAddress, WrData0, WrData1);
-                        Log(str);
-#endif
                         if( !FLASH_WriteDoubleWord(ProgAddress, WrData0, WrData1 ))
                         {
                             Log("Error al escribir programa\n");
@@ -867,8 +863,6 @@ int WriteHexRecord2Flash(UINT8* HexRecord)
 ********************************************************************/
 BOOL ValidAppPresent(void)
 {
-	volatile UINT32 *AppPtr;
-	
 	if(FLASH_ReadWord(USER_APP_RESET_ADDRESS) == 0xFFFFFFFF)
 	{
 		return FALSE;
@@ -960,7 +954,7 @@ int readLine(void *ptr, size_t max_len, FSFILE *stream)
 int CheckHexRecord(UINT8* HexRecord)
 {
     UINT8 Checksum = 0;
-    UINT8 RecDataLen;
+    UINT8 RecDataLen = 0;
     UINT8 i;
 
     // Hex Record checksum check.
@@ -994,13 +988,4 @@ int CheckHexRecord(UINT8* HexRecord)
     }
     /* Le falta el record final */
     return 0;
-}
-
-void Log(const char* msg)
-{
-    while(*msg)
-    {
-        while(U2STAbits.UTXBF);
-        U2TXREG = *msg++;
-    }
 }
