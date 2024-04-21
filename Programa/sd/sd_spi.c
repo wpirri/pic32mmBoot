@@ -1615,9 +1615,8 @@ void CloseSPIM (void)
 
 unsigned char WriteSPIM( unsigned char data_out )
 {
-    BYTE   clear;
     putcSPI((BYTE)data_out);
-    clear = getcSPI();
+    getcSPI();
     return ( 0 );                // return non-negative#
 }
 

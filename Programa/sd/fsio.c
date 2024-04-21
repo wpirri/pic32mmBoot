@@ -4346,19 +4346,20 @@ void FSGetDiskProperties(FS_DISK_PROPERTIES* properties)
 
 int FSfclose(FSFILE   *fo)
 {
-    WORD        fHandle;
 #ifndef FS_DYNAMIC_MEM
     WORD        fIndex;
 #endif
     int        error = 72;
 #ifdef ALLOW_WRITES
+    WORD        fHandle;
     DIRENTRY    dir;
 #endif
 
     FSerrno = CE_GOOD;
-    fHandle = fo->entry;
 
 #ifdef ALLOW_WRITES
+    fHandle = fo->entry;
+
     if(fo->flags.write)
     {
         if (gNeedDataWrite)
@@ -6930,7 +6931,7 @@ BYTE FormatFileName( const char* fileName, FILEOBJ fptr, BYTE mode)
 	#endif
 
 	// If the file name follows 8P3 type
-	if((NAME_LFN_TYPE != fileNameType) && (FALSE == supportLFN))
+	if((NAME_LFN_TYPE != fileNameType) && !supportLFN )
 	{
 		for (count3 = 0; count3 < temp; count3++)
 		{
@@ -6972,7 +6973,7 @@ BYTE FormatFileName( const char* fileName, FILEOBJ fptr, BYTE mode)
 		}
 		
 		// If LFN not supported try to adjust in 8P3 format
-		if(FALSE == supportLFN)
+		if(!supportLFN)
 		{
 		    // point fN2 to short file name
 		    fN2 = fptr -> name;
@@ -7039,7 +7040,7 @@ BYTE FormatFileName( const char* fileName, FILEOBJ fptr, BYTE mode)
 	}
 
 	// If the file name follows LFN format
-    if((NAME_LFN_TYPE == fileNameType) || (TRUE == supportLFN))
+    if((NAME_LFN_TYPE == fileNameType) || supportLFN )
 	{
 		#if defined(SUPPORT_LFN)  	
 
@@ -7210,7 +7211,7 @@ BYTE FormatDirName (char * string,FILEOBJ fptr, BYTE mode)
 	#endif
 
 	// If the file name follows LFN format
-    if((NAME_LFN_TYPE == fileNameType) || (TRUE == supportLFN))
+    if((NAME_LFN_TYPE == fileNameType) || supportLFN )
 	{
 		#if !defined(SUPPORT_LFN)
         	return FALSE;
