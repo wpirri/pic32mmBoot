@@ -45,13 +45,13 @@ void delay_us(unsigned int us)
 
 static uint32_t FLASH_NVMUnlock(uint32_t operation)
 {
-    unsigned int status;
+    volatile uint32_t processorStatus;
 
-    // Suspend or Disable all Interrupts
-    asm volatile ("di %0" : "=r" (status));
+    processorStatus = __builtin_disable_interrupts();
 
     // Flash operation to perform
     NVMCON = operation;
+    NVMKEY = 0x00000000;
 
     // Data sheet prescribes 6us delay for LVD to become stable.
     // To be on the safer side, we shall set 7us delay.
@@ -65,19 +65,9 @@ static uint32_t FLASH_NVMUnlock(uint32_t operation)
     NVMCONSET = 0x8000;
 
     // Wait for operation to complete
-    while (NVMCON & 0x8000)
-    {
-    };
+    while (NVMCON & 0x8000);
 
-    // Restore Interrupts
-    if ((status & 0x00000001) == 1)
-    {
-        asm volatile ("ei");
-    }
-    else
-    {
-        asm volatile ("di");
-    }
+    __builtin_mtc0(12, 0, processorStatus);
 
     // Disable NVM write enable
     NVMCONCLR = 0x0004000;
@@ -132,7 +122,7 @@ bool FLASH_ErasePage(uint32_t address)
 
 uint32_t FLASH_ReadWord(uint32_t address)
 {
-    return *(uint32_t*) address;
+    return *(uint32_t*)KVA0_TO_KVA1(address);
 }
 
 

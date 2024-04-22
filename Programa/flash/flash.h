@@ -29,6 +29,20 @@
 #include <stdbool.h>
 //-------------------------------
 
+/* 
+ * Translate a kernel address in KSEG0 or KSEG1 to a real
+ * physical address and back.
+ */
+#define KVA_TO_PA(v) 	((v) & 0x1fffffff)
+#define PA_TO_KVA0(pa)	((pa) | 0x80000000)
+#define PA_TO_KVA1(pa)	((pa) | 0xa0000000)
+
+/* translate between KSEG0 and KSEG1 addresses */
+#define KVA0_TO_KVA1(v)	((v) | 0x20000000)
+#define KVA1_TO_KVA0(v)	((v) & ~0x20000000)
+
+#define WORD_ALIGN_MASK         (~(sizeof(uint32_t) - 1U))
+
 #define FLASH_PC_UNITS_PER_INSTRUCTION 4
 #define FLASH_WORD_WRITE_SIZE_IN_INSTRUCTIONS 2
 

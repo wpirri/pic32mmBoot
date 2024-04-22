@@ -85,20 +85,6 @@
 #define MODE_LED        LATAbits.LATA1
 #define AUX_LED         LATAbits.LATA4
 
-/* 
- * Translate a kernel address in KSEG0 or KSEG1 to a real
- * physical address and back.
- */
-#define KVA_TO_PA(v) 	((v) & 0x1fffffff)
-#define PA_TO_KVA0(pa)	((pa) | 0x80000000)
-#define PA_TO_KVA1(pa)	((pa) | 0xa0000000)
-
-/* translate between KSEG0 and KSEG1 addresses */
-#define KVA0_TO_KVA1(v)	((v) | 0x20000000)
-#define KVA1_TO_KVA0(v)	((v) & ~0x20000000)
-
-#define WORD_ALIGN_MASK         (~(sizeof(uint32_t) - 1U))
-
 /******************************************************************************
 Macros used in this file
 *******************************************************************************/
@@ -110,7 +96,7 @@ Macros used in this file
 /* ************************************************************************** */
 /* Estos valores dependen de lo definido en el Linker Script                  */
 /* ************************************************************************** */
-/* Parámetros afectados en Linker file
+/* Parï¿½metros afectados en Linker file
  * _ebase_address
  * 
  * _RESET_ADDR
@@ -482,16 +468,7 @@ int main(void)
             {
                 /* Cuando encuentra el registro final sale con 1 */
                 Log("Fin de carga de programa\n");
-                if(ValidAppPresent())
-                {
-                    Log("Iniciando programa cargado\n");
-                    JumpToApp();
-                }
-                else
-                {
-                    Log("No hay programa cargado\n");
-                    Error(8);
-                }
+                JumpToApp();
             }
             // Blink LED
             BlinkLed(300);
@@ -580,18 +557,15 @@ void __attribute__((optimize("-O0"))) Error( unsigned int err )
 ********************************************************************/
 void JumpToApp( void )
 {
+    void (*fptr)(void);
+
     STATUS_LED = 1;
     MODE_LED = 1;
     AUX_LED = 0;
-
-    while(1);
-    
-    void (*fptr)(void);
-
-    fptr = (void (*)(void))USER_APP_RESET_ADDRESS;
-
     Log("Iniciando...\n");
     for(before_run_delay_count = 10000000; before_run_delay_count > 0; before_run_delay_count--);
+
+    fptr = (void (*)(void))KVA0_TO_KVA1(USER_APP_RESET_ADDRESS);
 
     __builtin_disable_interrupts();
 
