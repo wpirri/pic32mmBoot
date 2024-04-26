@@ -21,17 +21,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "log.h"
-#include "sd/fsio.h"
-#include "flash/flash.h"
-
-#define __DEBUG__
-#define READ_RETRY 100
-#define VERIFY_PROGRAM
-
-#define PROGRAM_FILE_NAME       "PGM.HEX"
-#define PROGRAM_FILE_NAME_BK    "PGMBK.HEX"
-
+#include "pgm.h"
 
 /*
  RA0    Led status  (azul)
@@ -73,7 +65,7 @@
 #pragma config SOSCEN = OFF    //Secondary Oscillator Enable bit->Secondary oscillator is disabled
 #pragma config IESO = ON    //Two Speed Startup Enable bit->Two speed startup is enabled
 #pragma config POSCMOD = OFF    //Primary Oscillator Selection bit->Primary oscillator is disabled
-#pragma config OSCIOFNC = OFF    //System Clock on CLKO Pin Enable bit->OSCO pin operates as a normal I/O
+#pragma config OSCIOFNC = OFF    //OFF para RA4 como Digital I/O
 #pragma config SOSCSEL = ON    //Secondary Oscillator External Clock Enable bit->SCLKI pin configured for Digital mode
 #pragma config FCKSM = CSECME    //Clock Switching and Fail-Safe Clock Monitor Enable bits->Clock switching is enabled; Fail-safe clock monitor is enabled
 
@@ -81,111 +73,75 @@
 #pragma config CP = OFF                 // Code Protection Enable bit (Code protection is disabled)
 /* ************************************************************************** */
 
-#define STATUS_LED      LATAbits.LATA0
-#define MODE_LED        LATAbits.LATA1
-#define AUX_LED         LATAbits.LATA4
+/* * Manejo de excepciones ************************************************** */
+static enum {
+    EXCEP_IRQ = 0,            // interrupt
+    EXCEP_AdEL = 4,            // address error exception (load or ifetch)
+    EXCEP_AdES,                // address error exception (store)
+    EXCEP_IBE,                // bus error (ifetch)
+    EXCEP_DBE,                // bus error (load/store)
+    EXCEP_Sys,                // syscall
+    EXCEP_Bp,                // breakpoint
+    EXCEP_RI,                // reserved instruction
+    EXCEP_CpU,                // coprocessor unusable
+    EXCEP_Overflow,            // arithmetic overflow
+    EXCEP_Trap,                // trap (possible divide by zero)
+    EXCEP_IS1 = 16,            // implementation specfic 1
+    EXCEP_CEU,                // CorExtend Unuseable
+    EXCEP_C2E                // coprocessor 2
+} _excep_code;
 
-/******************************************************************************
-Macros used in this file
-*******************************************************************************/
-#define AUX_FLASH_BASE_ADRS             (0x7FC000)
-#define AUX_FLASH_END_ADRS              (0x7FFFFF)
-#define DEV_CONFIG_REG_BASE_ADDRESS     (0xF80000)
-#define DEV_CONFIG_REG_END_ADDRESS      (0xF80012)
 
-/* ************************************************************************** */
-/* Estos valores dependen de lo definido en el Linker Script                  */
-/* ************************************************************************** */
-/* Par�metros afectados en Linker file
- * _ebase_address
- * 
- * _RESET_ADDR
- * _BEV_EXCPT_ADDR
- * _DBG_EXCPT_ADDR
- * 
- * kseg0_program_mem
- * debug_exec_mem
- * kseg0_boot_mem
- * kseg1_boot_mem
- * 
- */
-/* APP_FLASH_BASE_ADDRESS and APP_FLASH_END_ADDRESS reserves program Flash for the application*/
-/* Rule:
- 		1)The memory regions kseg0_program_mem, kseg0_boot_mem, exception_mem and
- 		kseg1_boot_mem of the application linker script must fall with in APP_FLASH_BASE_ADDRESS
- 		and APP_FLASH_END_ADDRESS
-
- 		2)The base address and end address must align on  4K address boundary */
-
-#define APP_FLASH_BASE_ADDRESS 	0x9D006000
-#define APP_FLASH_END_ADDRESS   0x9D03FFFF
-
-/* Address of  the Flash from where the application starts executing */
-/* Rule: Set APP_FLASH_BASE_ADDRESS to _RESET_ADDR value of application linker script*/
-
-// For PIC32MX1xx and PIC32MX2xx Controllers only
-#define USER_APP_RESET_ADDRESS 	(APP_FLASH_BASE_ADDRESS + 0x1000)
-
-#define REC_FLASHED 0
-#define REC_NOT_FOUND 1
-#define REC_FOUND_BUT_NOT_FLASHED 2
-
-/* ************************************************************************** */
-#define DATA_RECORD 		0
-#define END_OF_FILE_RECORD 	1
-#define EXT_SEG_ADRS_RECORD 2
-#define EXT_LIN_ADRS_RECORD 4
-
-typedef struct
+void __attribute__((weak, nomips16)) _general_exception_handler (void)
 {
-    UINT8 *start;
-    UINT8 len;
-    UINT8 status;
-}T_REC;
+    static unsigned int _excep_addr;
+    static char* _except_str;
+    char str[80];
+    
+    asm volatile("mfc0 %0,$13" : "=r" (_excep_code));
+    asm volatile("mfc0 %0,$14" : "=r" (_excep_addr));
 
-typedef struct 
-{
-	UINT8 RecDataLen;
-	DWORD_VAL Address;
-	UINT8 RecType;
-	UINT8* Data;
-	UINT8 CheckSum;	
-	DWORD_VAL ExtSegAddress;
-	DWORD_VAL ExtLinAddress;
-}T_HEX_RECORD;	
+    _excep_code = (_excep_code & 0x0000007C) >> 2;
 
-/* ************************************************************************** */
+    switch(_excep_code){
+        case EXCEP_IRQ: _except_str = "interrupt"; break;
+        case EXCEP_AdEL: _except_str = "address error exception (load or ifetch)"; break;
+        case EXCEP_AdES: _except_str = "address error exception (store)"; break;
+        case EXCEP_IBE: _except_str = "bus error (ifetch)"; break;
+        case EXCEP_DBE: _except_str = "bus error (load/store)"; break;
+        case EXCEP_Sys: _except_str = "syscall"; break;
+        case EXCEP_Bp: _except_str = "breakpoint"; break;
+        case EXCEP_RI: _except_str = "reserved instruction"; break;
+        case EXCEP_CpU: _except_str = "coprocessor unusable"; break;
+        case EXCEP_Overflow: _except_str = "arithmetic overflow"; break;
+        case EXCEP_Trap: _except_str = "trap (possible divide by zero)"; break;
+        case EXCEP_IS1: _except_str = "implementation specfic 1"; break;
+        case EXCEP_CEU: _except_str = "CorExtend Unuseable"; break;
+        case EXCEP_C2E: _except_str = "coprocessor 2"; break;
+    }
 
-FSFILE * g_boot_file;
-unsigned int    g_led_count;
+    Log("[Exception] Compilacion " __DATE__ " " __TIME__ "\n");
+    Log("[Exception] Compilador " __VERSION__ "\n");
+    sprintf(str, "[Exception] %s\n", _except_str);
+    Log(str);
+    sprintf(str, "[Exception] Cde: 0x%04X Addr: 0x%08X\n", _excep_code, _excep_addr);
+    Log(str);
 
-UINT8 g_ascii_buffer[80];
-UINT8 g_hex_rec[100];
-volatile unsigned long before_run_delay_count;
-
-char* g_buffer[256];
-
-void JumpToApp( void );
-BOOL ValidAppPresent(void);
-void EraseFlash(void);
-int WriteHexRecord2Flash(UINT8* HexRecord);
-int CheckHexRecord(UINT8* HexRecord);
-void ConvertAsciiToHex(UINT8* asciiRec, UINT8* hexRec);
-int readLine(void *ptr, size_t max_len, FSFILE *stream);
-void BlinkLed(unsigned int period);
-void Error( unsigned int err );
-void Log(const char* msg);
-
+    while(1);
+}
 
 
 /*****************************************************************************/
 int main(void)
 {
-    g_boot_file = NULL;
+    FSFILE *boot_file = NULL;
     long bytecount;
     int byteread;
     int readretry;
     int validHex = 0;
+    uint8_t ascii_buffer[80];
+    uint8_t hex_rec[100];
+    int rc;
 
 /* ************************************************************************** */
 /*  Setting the Output Latch SFR(s) */
@@ -220,7 +176,7 @@ int main(void)
     ANSELB = 0x00000000;
 
 /* ************************************************************************** */
-/* M�dulo CPP */
+/* Modulo CPP */
     CCP1CON1 = 0x00000000;    
     CCP2CON1 = 0x00000000;    
     CCP3CON1 = 0x00000000;    
@@ -228,31 +184,10 @@ int main(void)
 /* ************************************************************************** */
 /* Change notification */
     CNCONB = 0x00000000;
-
-/* ************************************************************************** */
-/* Set the PPS */
-    // System Reg Unlock
-    SYSKEY = 0x12345678; //write invalid key to force lock
-    SYSKEY = 0xAA996655; //write Key1 to SYSKEY
-    SYSKEY = 0x556699AA; //write Key2 to SYSKEY
-    // unlock PPS
-    RPCONbits.IOLOCK = 0;
-    RPOR0bits.RP4R = 0x0004;    //RA3->UART2:U2TX
-    RPINR9bits.U2RXR = 0x0000;    //RA2->NADA - ( 0x0003 RA2->UART2:U2RX )
-    /* Agregado para mapeo de SPI */
-    RPOR1bits.RP6R = 0x0008;        //RB0->SPI2:SDO2
-    RPINR11bits.SDI2R = 0x0007;     //RB1->SPI2:SDI2
-    RPOR0bits.RP3R = 0x0009;        //RA2->SPI2:SCK2OUT
-    RPINR11bits.SCK2INR = 0x0003;   //RA2->SPI2:SCK2OUT
-    /* Agregado para mapeo de SPI */
-    // lock   PPS
-    RPCONbits.IOLOCK = 1; 
-    // System Reg Lock
-    SYSKEY = 0x00000000; 
 /* ************************************************************************** */
 /* OSCILLATOR Init */
     // System Reg Unlock
-    SYSKEY = 0x12345678; //write invalid key to force lock
+    SYSKEY = 0x00000000; 
     SYSKEY = 0xAA996655; //write Key1 to SYSKEY
     SYSKEY = 0x556699AA; //write Key2 to SYSKEY
     // CF No Clock Failure; FRCDIV FRC/1; SLPEN Device will enter Idle mode when a WAIT instruction is issued; NOSC SPLL; SOSCEN disabled; CLKLOCK Clock and PLL selections are not locked and may be modified; OSWEN Complete; 
@@ -267,8 +202,6 @@ int main(void)
     RNMICON = 0x0;
     // SBOREN disabled; VREGS disabled; RETEN disabled; 
     PWRCON = 0x0;
-    // System Reg Lock
-    SYSKEY = 0x00000000; 
     // WDTO disabled; EXTR disabled; POR disabled; SLEEP disabled; BOR disabled; PORIO disabled; IDLE disabled; PORCORE disabled; BCFGERR disabled; CMR disabled; BCFGFAIL disabled; SWR disabled; 
     RCON = 0x0;
     // ON disabled; DIVSWEN disabled; RSLP disabled; ROSEL SYSCLK; OE disabled; SIDL disabled; RODIV 0; 
@@ -277,10 +210,12 @@ int main(void)
     REFO1TRIM = 0x0;
     // SPDIVRDY disabled; 
     CLKSTAT = 0x0;
+    // System Reg Lock
+    SYSKEY = 0x00000000; 
 /* ************************************************************************** */
 /* Init RTCC */
     // System Reg Unlock
-    SYSKEY = 0x12345678; //write invalid key to force lock
+    SYSKEY = 0x00000000; //write invalid key to force lock
     SYSKEY = 0xAA996655; //write Key1 to SYSKEY
     SYSKEY = 0x556699AA; //write Key2 to SYSKEY
 
@@ -296,53 +231,40 @@ int main(void)
     // Enable RTCC 
     RTCCON1SET = (1 << _RTCCON1_ON_POSITION);
     RTCCON1SET = (1 << _RTCCON1_WRLOCK_POSITION);
-/* ************************************************************************** */
-/* UART2 */
-   IEC1bits.U2TXIE = 0;
-   IEC1bits.U2RXIE = 0;
-   // STSEL 1; PDSEL 8N; RTSMD disabled; OVFDIS disabled; ACTIVE disabled; RXINV disabled; WAKE disabled; BRGH enabled; IREN disabled; ON enabled; SLPEN disabled; SIDL disabled; ABAUD disabled; LPBACK disabled; UEN TX_RX; CLKSEL PBCLK; 
-   U2MODE = (0x8008 & ~(1<<15));  // disabling UART
-   // UTXISEL TX_ONE_CHAR; UTXINV disabled; ADDR 0; MASK 0; URXEN disabled; OERR disabled; URXISEL RX_ONE_CHAR; UTXBRK disabled; UTXEN disabled; ADDEN disabled; 
-   U2STA = 0x0;
-   // BaudRate = 115200; Frequency = 24000000 Hz; BRG 51; 
-   U2BRG = 0x33;
-    //Make sure to set LAT bit corresponding to TxPin as high before UART initialization
-   U2STASET = _U2STA_UTXEN_MASK;
-   U2MODESET = _U2MODE_ON_MASK;  // enabling UART ON bit
-   U2STASET = _U2STA_URXEN_MASK; 
-/* ************************************************************************** */
     // System Reg Lock
-    SYSKEY = 0x00000000; 
+    SYSKEY = 0x00000000; //write invalid key to force lock
+/* ************************************************************************** */
+    RCON = 0x00000000;
 /* ************************************************************************** */
     TRISAbits.TRISA0 = 0;
     TRISAbits.TRISA1 = 0;
     TRISAbits.TRISA4 = 0;
     
-    g_led_count = 0;
 /* ************************************************************************** */
 /* INTERRUPT Initialize */
     // Enable Multi Vector Configuration
     INTCONbits.MVEC = 1;
-    asm volatile("ei $0");
+    __builtin_enable_interrupts();
 /* ************************************************************************** */
 
     LogInit();
-    Log("PIC32MM0256 Boot Loader Init Ok\n");
             
+    NVM_Initialize();
+    
     // Initialize the File System
     if(!FSInit())
     {
-        Log("No se pudo montar la terjeta SD\n");
+        Log("[main] No se pudo montar la terjeta SD.");
         /* Si no puedo iniciaizar la SD trato de saltar al programa */
         if(ValidAppPresent())
         {
-            Log("Iniciando programa previamente cargado\n");
+            Log("[main] Iniciando programa previamente cargado.");
             JumpToApp();
         }
         else
         {
             //Indicate error and stay in while loop.
-            Log("No hay programa cargado\n");
+            Log("[main] No hay programa cargado.");
             Error(1);
         }
     }         
@@ -350,50 +272,57 @@ int main(void)
     STATUS_LED = 1;
     
     /* Siempre que haya un archivo en la SD lo cargo */
-    g_boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
+    boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
 
-    if(g_boot_file == NULL)// Make sure the file is present.
+    if(boot_file == NULL)// Make sure the file is present.
     {
-        Log("La tarjeta SD no tiene PGM.HEX\n");
+        Log("[main] La tarjeta SD no tiene PGM.HEX.");
         if(ValidAppPresent())
         {
-            Log("Iniciando programa previamente cargado\n");
+            Log("[main] Iniciando programa previamente cargado.");
             JumpToApp();
         }
         else
         {
             /* Trato de abrir un bacup */
-            g_boot_file = FSfopen(PROGRAM_FILE_NAME_BK, "r");
+            boot_file = FSfopen(PROGRAM_FILE_NAME_BK, "r");
 
-            if(g_boot_file == NULL)// Make sure the file is present.
+            if(boot_file == NULL)// Make sure the file is present.
             {
-                Log("La tarjeta SD no tiene PGMBK.HEX\n");
+                Log("[main] La tarjeta SD no tiene PGMBK.HEX.");
                 //Indicate error and stay in while loop.
                 Error(2);
             }
         }
     }     
 
-    Log("PGM.HEX encontrado\n");
+    Log("[main] PGM.HEX encontrado.");
     MODE_LED = 1;
 
 #ifdef VERIFY_PROGRAM
-    Log("Verificando archivo PGM.HEX\n");
+    Log("[main] Verificando archivo PGM.HEX.");
     /* Verifico el archivo HEX */
     bytecount = 0;
     readretry = READ_RETRY;
-    while(readretry && bytecount < g_boot_file->size && validHex == 0)
+    rc = 0;
+    while(readretry && bytecount < boot_file->size && rc == 0 )
     {
-        while((byteread = readLine(g_ascii_buffer, 80, g_boot_file)) > 0)
+        while((byteread = readLine(ascii_buffer, 80, boot_file)) > 0)
         {
             /* Cada vez que leo bien reseteo el contador de errores */
             readretry = READ_RETRY;
             /* Voy contando lo bytes leidos */
             bytecount += byteread;
             /* Salt?o los ':' iniciales */
-            ConvertAsciiToHex(&g_ascii_buffer[1],g_hex_rec);
+            ConvertAsciiToHex(&ascii_buffer[1],hex_rec);
 
-            if( CheckHexRecord(g_hex_rec))
+            rc = CheckHexRecord(hex_rec);
+            if(rc < 0)
+            {
+                Log((char*)ascii_buffer);
+                break;
+            }
+            else if(rc > 0)
             {
                 validHex = 1;
                 break;
@@ -403,16 +332,16 @@ int main(void)
         }//while(1)
 
         /* Me fijo si ley? todo */
-        if(readretry && bytecount < g_boot_file->size && validHex == 0)
+        if(readretry && bytecount < boot_file->size && validHex == 0)
         {
             readretry--;
             /* Cierro el archivo */
-            FSfclose(g_boot_file);
+            FSfclose(boot_file);
             /* Lo vuelvo a abrir */
-            g_boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
-            if( !g_boot_file) g_boot_file = FSfopen(PROGRAM_FILE_NAME_BK, "r");
+            boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
+            if( !boot_file) boot_file = FSfopen(PROGRAM_FILE_NAME_BK, "r");
             /* me paro donde se hab?a cortado */
-            FSfseek(g_boot_file, bytecount, SEEK_SET);
+            FSfseek(boot_file, bytecount, SEEK_SET);
         }
 
     }
@@ -422,26 +351,26 @@ int main(void)
     /* Si el HEX no sirve */
     if(validHex == 0)
     {
-        Log("Archivo PGM.HEX invalido\n");
+        Log("[main] Archivo PGM.HEX invalido.");
         if(ValidAppPresent())
         {
-            Log("Iniciando programa previamente cargado\n");
+            Log("[main] Iniciando programa previamente cargado.");
             JumpToApp();
         }
         else
         {
-            Log("No hay programa cargado\n");
+            Log("[main] No hay programa cargado.");
             //Indicate error and stay in while loop.
             Error(3);
         }
     }
 
     /* Cierro el archivo */
-    FSfclose(g_boot_file);
-    Log("PGM.HEX verificado\n");
+    FSfclose(boot_file);
+    Log("[main] PGM.HEX verificado.");
     /* Lo vuelvo a abrir */
-    g_boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
-    if( !g_boot_file) g_boot_file = FSfopen(PROGRAM_FILE_NAME_BK, "r");
+    boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
+    if( !boot_file) boot_file = FSfopen(PROGRAM_FILE_NAME_BK, "r");
 #endif /* VERIFY_PROGRAM */
 
     // Erase Flash (Block Erase the program Flash)
@@ -449,517 +378,53 @@ int main(void)
 
     MODE_LED = 0;
     
-    Log("Cargando programa\n");
+    Log("[main] Cargando programa.");
     /* Un parche de reintentos para salvar errores de lectura de las SD */
     bytecount = 0;
     readretry = READ_RETRY;
-    while(readretry && bytecount < g_boot_file->size)
+    while(readretry && bytecount < boot_file->size)
     {
-        while((byteread = readLine(g_ascii_buffer, 80, g_boot_file)) > 0)
+        while((byteread = readLine(ascii_buffer, 80, boot_file)) > 0)
         {
             /* Cada vez que leo bien reseteo el contador de errores */
             readretry = READ_RETRY;
             /* Voy contando lo bytes leidos */
             bytecount += byteread;
             /* Salt?o los ':' iniciales */
-            ConvertAsciiToHex(&g_ascii_buffer[1],g_hex_rec);
-
-            if(WriteHexRecord2Flash(g_hex_rec))
+            ConvertAsciiToHex(&ascii_buffer[1],hex_rec);
+            rc = WriteHexRecord2Flash(hex_rec);
+            if(rc > 0)
             {
                 /* Cuando encuentra el registro final sale con 1 */
-                Log("Fin de carga de programa\n");
+                Log("[main] Fin de carga de programa.");
                 JumpToApp();
+            }
+            else if(rc < 0)
+            {
+                Log((char*)ascii_buffer);
+                Error(0-rc);
             }
             // Blink LED
             BlinkLed(300);
         }//while(1)
 
         /* Me fijo si ley? todo */
-        if(readretry && bytecount < g_boot_file->size)
+        if(readretry && bytecount < boot_file->size)
         {
             readretry--;
             /* Cierro el archivo */
-            FSfclose(g_boot_file);
+            FSfclose(boot_file);
             /* Lo vuelvo a abrir */
-            g_boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
-            if( !g_boot_file) g_boot_file = FSfopen(PROGRAM_FILE_NAME_BK, "r");
+            boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
+            if( !boot_file) boot_file = FSfopen(PROGRAM_FILE_NAME_BK, "r");
             /* me paro donde se hab?a cortado */
-            FSfseek(g_boot_file, bytecount, SEEK_SET);
+            FSfseek(boot_file, bytecount, SEEK_SET);
         }
 
     }
     /* Si pasa por ac? es un error en el archivo HEX */
-    FSfclose(g_boot_file);
-    Log("El bootloader termino sin cargar programa\n");
+    FSfclose(boot_file);
+    Log("[main] El bootloader termino sin cargar programa.");
     Error(4);
-    return 0;
-}
-
-/******************************************************************************
- * 
- *****************************************************************************/
-void BlinkLed(unsigned int period)
-{
-    if( !((++g_led_count) % period) ) AUX_LED ^= 1;
-}
-
-/******************************************************************************
- * 
- *****************************************************************************/
-void __attribute__((optimize("-O0"))) Error( unsigned int err )
-{
-    volatile unsigned long delay_count;
-    unsigned int pulse_count;
-    unsigned int loop_count;
-    /* Valores de err:
-     * 1: No hay SD y no hay programa en el micro
-     * 2: No hay programa en la SD ni en el micro
-     * 3: El programa en la SD no es valido y no hay programa en el micro
-     * 4: Error de lectura cargando programa
-     * 5: Error de checksum cargando programa
-     */
-    AUX_LED = 0;
-    pulse_count = err;
-    loop_count = 10;
-    for(delay_count = 1000000; delay_count > 0; delay_count--);
-    while(1)
-    {
-        for(delay_count = 1000000; delay_count > 0; delay_count--);
-        if(pulse_count)
-        {
-            AUX_LED = 1;
-            pulse_count--;
-        }
-        loop_count--;
-        for(delay_count = 1000000; delay_count > 0; delay_count--);
-        AUX_LED = 0;
-        if( !loop_count)
-        {
-            pulse_count = err;
-            loop_count = 10;
-        }
-    }
-}
-
-/********************************************************************
-* Function: 	JumpToApp( void )
-*
-* Precondition: 
-*
-* Input: 		None.
-*
-* Output:		
-*
-* Side Effects:	No return from here.
-*
-* Overview: 	Jumps to application.
-*
-********************************************************************/
-void JumpToApp( void )
-{
-    void (*fptr)(void);
-
-    STATUS_LED = 1;
-    MODE_LED = 1;
-    AUX_LED = 0;
-    Log("Iniciando...\n");
-    for(before_run_delay_count = 10000000; before_run_delay_count > 0; before_run_delay_count--);
-
-    fptr = (void (*)(void))KVA0_TO_KVA1(USER_APP_RESET_ADDRESS);
-
-    __builtin_disable_interrupts();
-
-    fptr();
-}
-
-/********************************************************************
-* Function: 	ConvertAsciiToHex()
-*
-* Precondition: 
-*
-* Input: 		Ascii buffer and hex buffer.
-*
-* Output:		
-*
-* Side Effects:	No return from here.
-*
-* Overview: 	Converts ASCII to Hex.
-*
-*			
-* Note:		 	None.
-********************************************************************/
-void ConvertAsciiToHex(UINT8* asciiRec, UINT8* hexRec)
-{
-	UINT8 i = 0;
-	UINT8 k = 0;
-	UINT8 hex;
-	
-	
-	while((asciiRec[i] >= 0x30) && (asciiRec[i] <= 0x66))
-	{
-		// Check if the ascci values are in alpha numeric range.
-		
-		if(asciiRec[i] < 0x3A)
-		{
-			// Numerical reperesentation in ASCII found.
-			hex = asciiRec[i] & 0x0F;
-		}
-		else
-		{
-			// Alphabetical value.
-			hex = 0x09 + (asciiRec[i] & 0x0F);						
-		}
-	
-		// Following logic converts 2 bytes of ASCII to 1 byte of hex.
-		k = i%2;
-		
-		if(k)
-		{
-			hexRec[i/2] |= hex;
-			
-		}
-		else
-		{
-			hexRec[i/2] = (hex << 4) & 0xF0;
-		}	
-		i++;		
-	}		
-	
-}
-// Do not change this
-#define FLASH_PAGE_SIZE 0x1000
-/********************************************************************
-* Function: 	EraseFlash()
-*
-* Precondition: 
-*
-* Input: 		None.
-*
-* Output:		
-*
-* Side Effects:	No return from here.
-*
-* Overview: 	Erases Flash (Block Erase).
-*
-*			
-* Note:		 	None.
-********************************************************************/
-void EraseFlash(void)
-{
-	uint32_t pFlash;
-    INT i;
-    char str[256];
-
-    Log("Blanqueando area de programa\n");
-    pFlash = (uint32_t)APP_FLASH_BASE_ADDRESS;									
-    for( i = 0; i < ((APP_FLASH_END_ADDRESS - APP_FLASH_BASE_ADDRESS + 1)/FLASH_PAGE_SIZE); i++ )
-    {
-        // Assert on NV error. This must be caught during debug phase.
-#ifdef __DEBUG__
-        sprintf(str, "Flash Erase Address: 0x%X\n", ( pFlash + (i*FLASH_PAGE_SIZE)));
-        Log(str);
-#endif
-        if( !FLASH_ErasePage( pFlash + (i*FLASH_PAGE_SIZE) ))
-        {
-           // We have a problem. This must be caught during the debug phase.
-            Log("Error al blanquear memoria de programa");
-            Error(7);
-        } 
-        // Blink LED to indicate erase is in progress.
-        BlinkLed(10);
-    }			           	     
-}
-
-/********************************************************************
-* Function: 	WriteHexRecord2Flash()
-*
-* Precondition: 
-*
-* Input: 		None.
-*
-* Output:		
-*
-* Side Effects:	No return from here.
-*
-* Overview: 	Writes Hex Records to Flash.
-*
-*			
-* Note:		 	None.
-********************************************************************/
-int WriteHexRecord2Flash(UINT8* HexRecord)
-{
-    static T_HEX_RECORD HexRecordSt;
-    uint32_t WrData0;
-    uint32_t WrData1;
-    uint32_t ProgAddress;
-    UINT8 Checksum = 0;
-    UINT8 i;
-
-    HexRecordSt.RecDataLen = HexRecord[0];
-    HexRecordSt.RecType = HexRecord[3];
-    HexRecordSt.Data = &HexRecord[4];
-	
-    // Hex Record checksum check.
-    for(i = 0; i < HexRecordSt.RecDataLen + 5; i++)
-    {
-            Checksum += HexRecord[i];
-    }
-	
-    if(Checksum != 0)
-    {
-        //Error. Hex record Checksum mismatch.
-        //Indicate Error by switching ON all LEDs.
-        Log("Error de checksum en archivo HEX\n");
-        Error(5);
-    }
-    else
-    {
-        // Hex record checksum OK.
-        switch(HexRecordSt.RecType)
-        {
-            case DATA_RECORD:  //Record Type 00, data record.
-                HexRecordSt.Address.byte.MB = 0;
-                HexRecordSt.Address.byte.UB = 0;
-                HexRecordSt.Address.byte.HB = HexRecord[1];
-                HexRecordSt.Address.byte.LB = HexRecord[2];
-                // Derive the address.
-                HexRecordSt.Address.Val = HexRecordSt.Address.Val + HexRecordSt.ExtLinAddress.Val + HexRecordSt.ExtSegAddress.Val;
-                while(HexRecordSt.RecDataLen) // Loop till all bytes are done.
-                {
-                    // Convert the Physical address to Virtual address.
-                    ProgAddress = (uint32_t)PA_TO_KVA0(HexRecordSt.Address.Val);
-                    // Make sure we are not writing boot area and device configuration bits.
-                    if(((ProgAddress >= (uint32_t)APP_FLASH_BASE_ADDRESS) && (ProgAddress <= (uint32_t)APP_FLASH_END_ADDRESS))
-                       && ((ProgAddress < (uint32_t)DEV_CONFIG_REG_BASE_ADDRESS) || (ProgAddress > (uint32_t)DEV_CONFIG_REG_END_ADDRESS)))
-                    {
-                        if(ProgAddress & 0x00000007)
-                        {
-                            /* Second WORD */
-                            if(HexRecordSt.RecDataLen < 4)
-                            {
-                                // Sometimes record data length will not be in multiples of 4. Appending 0xFF will make sure that..
-                                // we don't write junk data in such cases.
-                                WrData1 = 0xFFFFFFFF;
-                                memcpy(&WrData1, HexRecordSt.Data, HexRecordSt.RecDataLen);
-                            }
-                            else
-                            {
-                                memcpy(&WrData1, HexRecordSt.Data, 4);
-                            }
-                            WrData0 = FLASH_ReadWord(ProgAddress - 4);
-                            ProgAddress -= 4;
-                        }
-                        else
-                        {
-                            /* First WORD */
-                            if(HexRecordSt.RecDataLen < 4)
-                            {
-                                // Sometimes record data length will not be in multiples of 4. Appending 0xFF will make sure that..
-                                // we don't write junk data in such cases.
-                                WrData0 = 0xFFFFFFFF;
-                                memcpy(&WrData0, HexRecordSt.Data, HexRecordSt.RecDataLen);
-                            }
-                            else
-                            {
-                                memcpy(&WrData0, HexRecordSt.Data, 4);
-                            }
-                            WrData1 = FLASH_ReadWord(ProgAddress + 4);
-                        }
-                        // Write the data into flash.
-                        // Assert on error. This must be caught during debug phase.
-                        if( !FLASH_WriteDoubleWord(ProgAddress, WrData0, WrData1 ))
-                        {
-                            Log("Error al escribir programa\n");
-                            Error(6);
-                        }
-                    }
-                    // Increment the address.
-                    HexRecordSt.Address.Val += 4;
-                    // Increment the data pointer.
-                    HexRecordSt.Data += 4;
-                    // Decrement data len.
-                    if(HexRecordSt.RecDataLen > 3)
-                    {
-                        HexRecordSt.RecDataLen -= 4;
-                    }
-                    else
-                    {
-                        HexRecordSt.RecDataLen = 0;
-                    }
-                }
-                break;
-        case EXT_SEG_ADRS_RECORD:  // Record Type 02, defines 4th to 19th bits of the data address.
-            HexRecordSt.ExtSegAddress.byte.MB = 0;
-            HexRecordSt.ExtSegAddress.byte.UB = HexRecordSt.Data[0];
-            HexRecordSt.ExtSegAddress.byte.HB = HexRecordSt.Data[1];
-            HexRecordSt.ExtSegAddress.byte.LB = 0;
-            // Reset linear address.
-            HexRecordSt.ExtLinAddress.Val = 0;
-            break;
-        case EXT_LIN_ADRS_RECORD:   // Record Type 04, defines 16th to 31st bits of the data address.
-            HexRecordSt.ExtLinAddress.byte.MB = HexRecordSt.Data[0];
-            HexRecordSt.ExtLinAddress.byte.UB = HexRecordSt.Data[1];
-            HexRecordSt.ExtLinAddress.byte.HB = 0;
-            HexRecordSt.ExtLinAddress.byte.LB = 0;
-            // Reset segment address.
-            HexRecordSt.ExtSegAddress.Val = 0;
-            break;
-        case END_OF_FILE_RECORD:  //Record Type 01, defines the end of file record.
-            HexRecordSt.ExtSegAddress.Val = 0;
-            HexRecordSt.ExtLinAddress.Val = 0;
-            return 1; /* Listo para saltar a la APP */
-            break;
-        default:
-            HexRecordSt.ExtSegAddress.Val = 0;
-            HexRecordSt.ExtLinAddress.Val = 0;
-            break;
-        }
-    }
-    return 0;
-}	
-
-/********************************************************************
-* Function: 	ValidAppPresent()
-*
-* Precondition: 
-*
-* Input: 		None.
-*
-* Output:		TRUE: If application is valid.
-*
-* Side Effects:	None.
-*
-* Overview: 	Logic: Check application vector has 
-				some value other than "0xFFFFFF"
-*
-*			
-* Note:		 	None.
-********************************************************************/
-BOOL ValidAppPresent(void)
-{
-	if(FLASH_ReadWord(USER_APP_RESET_ADDRESS) == 0xFFFFFFFF)
-	{
-		return FALSE;
-	}
-	else
-	{
-		return TRUE;
-	}
-}			
-
-/********************************************************************
-* Function: 	readLine()
-*
-* Precondition:
-*
-* Input:
-*
-* Output:
-*
-* Side Effects:	None.
-*
-* Overview:
-*
-*
-* Note:
-********************************************************************/
-int readLine(void *ptr, size_t max_len, FSFILE *stream)
-{
-    int len = 0;
-    char *p;
-    int rec_len;
-
-    p = ptr;
-
-    while(FSfread(p,1,1,stream))
-    {
-        if(*p != 0x0d && *p != 0x0a) break;
-    }
-    
-    /* Verifico que sea el inicio de l?nea */
-    if(*p != ':') return 0;
-    /* Avanzo el puntero */
-    p++;
-    len++;
-    /* Leo el tipo de registro */
-    FSfread(p,1,2,stream);
-    p[2] = 0;
-    /* Segun el tipo de registro me cargo el tama?o */
-    switch((int)strtol(p, NULL, 16))
-    {
-        case 0x00:
-            rec_len = 11;
-            break;
-        case 0x02:
-            rec_len = 15;
-            break;
-        case 0x04:
-            rec_len = 19;
-            break;
-        case 0x08:
-            rec_len = 27;
-            break;
-        case 0x0c:
-            rec_len = 35;
-            break;
-        case 0x10:
-            rec_len = 43;
-            break;
-        default:
-            return 0;
-    }
-    /* Avanzo el puntero */
-    p += 2;
-    len += 2;
-    /* le saco los 3 caracteres ya leidos leidos */
-    rec_len -= 3;
-    /* Le agrego uno para que quede adentro el linefeed */
-    rec_len += 1;
-    /* si es un tipo de registro conocido leo todo el registro de una */
-    if(FSfread(p,1,rec_len,stream) != rec_len) return 0;
-    p[rec_len] = 0x00;
-    len += rec_len;
-    return len;
-}
-
-/********************************************************************
- *
- ********************************************************************/
-int CheckHexRecord(UINT8* HexRecord)
-{
-    UINT8 Checksum = 0;
-    UINT8 RecDataLen = 0;
-    UINT8 i;
-
-    // Hex Record checksum check.
-    for(i = 0; i < RecDataLen + 5; i++)
-    {
-            Checksum += HexRecord[i];
-    }
-
-    if(Checksum != 0)
-    {
-        /* Error de checksum en un registro */
-        return 0;
-    }
-    else
-    {
-        // Hex record checksum OK.
-        switch(HexRecord[3])
-        {
-            case DATA_RECORD:  //Record Type 00, data record.
-                break;
-        case EXT_SEG_ADRS_RECORD:  // Record Type 02, defines 4th to 19th bits of the data address.
-            break;
-        case EXT_LIN_ADRS_RECORD:   // Record Type 04, defines 16th to 31st bits of the data address.
-            break;
-        case END_OF_FILE_RECORD:  //Record Type 01, defines the end of file record.
-            return 1; /* Listo para saltar a la APP */
-            break;
-        default:
-            break;
-        }
-    }
-    /* Le falta el record final */
     return 0;
 }

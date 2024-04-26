@@ -20,6 +20,8 @@
 
 void LogInit(void);
 void Log(const char* msg);
+void BlinkLed(unsigned int period);
+void Error( unsigned int err );
 
 #endif	/* LOG_H */
 
