@@ -120,11 +120,11 @@ void __attribute__((weak, nomips16)) _general_exception_handler (void)
         case EXCEP_C2E: _except_str = "coprocessor 2"; break;
     }
 
-    Log("[Exception] Compilacion " __DATE__ " " __TIME__ "\n");
-    Log("[Exception] Compilador " __VERSION__ "\n");
-    sprintf(str, "[Exception] %s\n", _except_str);
+    Log("[Exception] Compilacion " __DATE__ " " __TIME__ ".");
+    Log("[Exception] Compilador " __VERSION__ ".");
+    sprintf(str, "[Exception] %s.", _except_str);
     Log(str);
-    sprintf(str, "[Exception] Cde: 0x%04X Addr: 0x%08X\n", _excep_code, _excep_addr);
+    sprintf(str, "[Exception] Cde: 0x%04X Addr: 0x%08X.", _excep_code, _excep_addr);
     Log(str);
 
     while(1);

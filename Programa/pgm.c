@@ -15,6 +15,9 @@
     License along with this library; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  ***************************************************************************/
+/*
+ *       ***** El HEX file debe estar normalizado *****
+ */
 #include <xc.h>
 
 #include "pgm.h"
@@ -107,7 +110,6 @@ int readLine(void *ptr, size_t max_len, FSFILE *stream)
 /* ************************************************************************** */
 void __attribute__((optimize("-O0"))) JumpToApp( void )
 {
-    const uint32_t jumpAddrVal = *(uint32_t *)(USER_APP_RESET_ADDRESS & WORD_ALIGN_MASK);
     void (*fptr)(void);
     
     STATUS_LED = 1;
@@ -116,12 +118,7 @@ void __attribute__((optimize("-O0"))) JumpToApp( void )
     Log("[JumpToApp] Iniciando....");
     for(unsigned long i = 10000000; i > 0; i--);
 
-    if (jumpAddrVal == 0xffffffffU)
-    {
-        return;
-    }
-
-    fptr = (void (*)(void))USER_APP_RESET_ADDRESS;
+    fptr = (void (*)(void))(USER_APP_RESET_ADDRESS);
 
     (void) __builtin_disable_interrupts();
 
