@@ -49,34 +49,15 @@
 // For PIC32MX1xx and PIC32MX2xx Controllers only
 #define USER_APP_RESET_ADDRESS 	(APP_FLASH_BASE_ADDRESS + 0x1000)
 
+#define STATUS_LED      LATAbits.LATA0
+#define MODE_LED        LATAbits.LATA1
+#define AUX_LED         LATAbits.LATA4
 
 // Clock frequency values
 #define _XTAL_FREQ  24000000UL             // Hz
 #define GetSystemClock()		(_XTAL_FREQ)
 #define GetInstructionClock()	(GetSystemClock()/*/4*/)
 #define GetPeripheralClock()	(GetSystemClock()/*/4*/)
-
-#define FLASH_START                             (0x9d000000UL)
-#define FLASH_LENGTH                            (0x40000UL)
-#define PAGE_SIZE                               (256UL)
-#define ERASE_BLOCK_SIZE                        (2048UL)
-#define PAGES_IN_ERASE_BLOCK                    (ERASE_BLOCK_SIZE / PAGE_SIZE)
-
-/* 
- * Translate a kernel address in KSEG0 or KSEG1 to a real
- * physical address and back.
- */
-#define KVA_TO_PA(v) 	((v) & 0x1fffffff)
-#define PA_TO_KVA0(pa)	((pa) | 0x80000000)
-#define PA_TO_KVA1(pa)	((pa) | 0xa0000000)
-
-/* translate between KSEG0 and KSEG1 addresses */
-#define KVA0_TO_KVA1(v)	((v) | 0x20000000)
-#define KVA1_TO_KVA0(v)	((v) & ~0x20000000)
-
-#define STATUS_LED      LATAbits.LATA0
-#define MODE_LED        LATAbits.LATA1
-#define AUX_LED         LATAbits.LATA4
 
 #endif	/* CONFIG_H */
 

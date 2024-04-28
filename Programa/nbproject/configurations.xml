@@ -24,6 +24,7 @@
                    projectFiles="true">
       <itemPath>boot_p32MM0256GPM028.ld</itemPath>
       <itemPath>app_p32MM0256GPM028.ld</itemPath>
+      <itemPath>p32MM0256GPM028.ld</itemPath>
     </logicalFolder>
     <logicalFolder name="SourceFiles"
                    displayName="Source Files"
@@ -260,6 +261,7 @@
         <property key="event.recorder.debugger.behavior" value="Running"/>
         <property key="event.recorder.enabled" value="false"/>
         <property key="event.recorder.scvd.files" value=""/>
+        <property key="firmware.download.all" value="false"/>
         <property key="hwtoolclock.frcindebug" value="false"/>
         <property key="lastid" value=""/>
         <property key="memories.aux" value="false"/>
@@ -388,6 +390,8 @@
         </C32CPP>
         <C32Global>
         </C32Global>
+      </item>
+      <item path="p32MM0256GPM028.ld" ex="true" overriding="false">
       </item>
     </conf>
   </confs>

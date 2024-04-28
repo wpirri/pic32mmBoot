@@ -21,19 +21,18 @@
 #include "sd/fsio.h"
 #include "flash/plib_nvm.h"
 
-/******************************************************************************
-Macros used in this file
-*******************************************************************************/
-#define AUX_FLASH_BASE_ADRS             (0x7FC000)
-#define AUX_FLASH_END_ADRS              (0x7FFFFF)
-#define DEV_CONFIG_REG_BASE_ADDRESS     (0xF80000)
-#define DEV_CONFIG_REG_END_ADDRESS      (0xF80012)
+#define FLASH_START                             (0x9d000000UL)
+#define FLASH_LENGTH                            (0x40000UL)
+#define PAGE_SIZE                               (256UL)
+#define ERASE_BLOCK_SIZE                        (2048UL)
+#define PAGES_IN_ERASE_BLOCK                    (ERASE_BLOCK_SIZE / PAGE_SIZE)
+#define DEV_CONFIG_REG_BASE_ADDRESS             (0xF80000)
+#define DEV_CONFIG_REG_END_ADDRESS              (0xF80012)
 
 #define REC_FLASHED 0
 #define REC_NOT_FOUND 1
 #define REC_FOUND_BUT_NOT_FLASHED 2
 
-/* ************************************************************************** */
 #define DATA_RECORD 		0
 #define END_OF_FILE_RECORD 	1
 #define EXT_SEG_ADRS_RECORD 2

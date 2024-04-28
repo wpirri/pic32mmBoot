@@ -68,6 +68,11 @@
 #define NVM_FLASH_ROWSIZE          (256U)
 #define NVM_FLASH_PAGESIZE         (2048U)
 
+#define KVA_TO_PA(v) 	((v) & 0x1fffffff)
+#define PA_TO_KVA0(pa)	((pa) | 0x80000000)
+#define PA_TO_KVA1(pa)	((pa) | 0xa0000000)
+#define KVA0_TO_KVA1(v)	((v) | 0x20000000)
+#define KVA1_TO_KVA0(v)	((v) & ~0x20000000)
 
 /* No error */
 #define     NVM_ERROR_NONE         (0x0U)

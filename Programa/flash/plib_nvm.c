@@ -50,7 +50,6 @@
 #include "xc.h"
 
 #include "plib_nvm.h"
-#include "../config.h"
 
 #include <stdio.h>
 #include <stdlib.h>

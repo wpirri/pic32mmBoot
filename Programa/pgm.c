@@ -17,6 +17,7 @@
  ***************************************************************************/
 /*
  *       ***** El HEX file debe estar normalizado *****
+ *      https://github.com/Microchip-MPLAB-Harmony/bootloader_apps_uart/blob/master/docs/GUID-3E6213D5-3312-49A9-A6C7-897B8AD57414.md
  */
 #include <xc.h>
 
@@ -118,7 +119,7 @@ void __attribute__((optimize("-O0"))) JumpToApp( void )
     Log("[JumpToApp] Iniciando....");
     for(unsigned long i = 10000000; i > 0; i--);
 
-    fptr = (void (*)(void))(USER_APP_RESET_ADDRESS);
+    fptr = (void (*)(void))KVA0_TO_KVA1(USER_APP_RESET_ADDRESS);
 
     (void) __builtin_disable_interrupts();
 

@@ -70,6 +70,9 @@ OPTIONAL("processor.o")
  *   xc32-gcc src.c -Wl,--defsym=_vector_spacing=2
  *   xc32-gcc src.c -Wl,--defsym=_ebase_address=0x9D001000
  *************************************************************************/
+/* Bootloader */
+#define _boot_size 0x6000
+
 PROVIDE(_vector_spacing = 0x0001);
 PROVIDE(_ebase_address = 0x9D000000);
 
@@ -106,8 +109,9 @@ _GEN_EXCPT_ADDR                = _ebase_address + 0x180;
 
 
 MEMORY
-{                                                 /* BOOTLOADER_SIZE */
-  kseg0_program_mem     (rx)  : ORIGIN = 0x9D000000, LENGTH = 0x6000
+{
+  /* Bootloader */
+  kseg0_program_mem     (rx)  : ORIGIN = 0x9D000000, LENGTH = _boot_size
   debug_exec_mem              : ORIGIN = 0x9FC00490, LENGTH = 0x760
   kseg0_boot_mem              : ORIGIN = 0x9FC00490, LENGTH = 0x0
   kseg1_boot_mem              : ORIGIN = 0xBFC00000, LENGTH = 0x490
