@@ -227,8 +227,8 @@ int WriteHexRecord2Flash(uint8_t* HexRecord)
                     // Convert the Physical address to Virtual address.
                     ProgAddress = (uint32_t)PA_TO_KVA0(HexRecordSt.Address.Val);
                     // Make sure we are not writing boot area and device configuration bits.
-                    if( ((ProgAddress >= (uint32_t)APP_FLASH_BASE_ADDRESS) && (ProgAddress <= (uint32_t)APP_FLASH_END_ADDRESS)) )
-                       //&& ((ProgAddress < (uint32_t)DEV_CONFIG_REG_BASE_ADDRESS) || (ProgAddress > (uint32_t)DEV_CONFIG_REG_END_ADDRESS)))
+                    if( ((ProgAddress >= (uint32_t)APP_FLASH_BASE_ADDRESS) && (ProgAddress <= (uint32_t)APP_FLASH_END_ADDRESS))
+                        && ((ProgAddress < (uint32_t)DEV_CONFIG_REG_BASE_ADDRESS) || (ProgAddress > (uint32_t)DEV_CONFIG_REG_END_ADDRESS)))
                     {
                         if(ProgAddress & 0x00000007)
                         {
