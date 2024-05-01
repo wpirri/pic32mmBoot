@@ -31,7 +31,7 @@
  * kseg1_boot_mem
  * 
  */
-#define BOOTLOADER_SIZE 0x6000
+#define BOOTLOADER_SIZE 0x8000
 /* APP_FLASH_BASE_ADDRESS and APP_FLASH_END_ADDRESS reserves program Flash for the application*/
 /* Rule:
  		1)The memory regions kseg0_program_mem, kseg0_boot_mem, exception_mem and
@@ -47,7 +47,7 @@
 /* Rule: Set APP_FLASH_BASE_ADDRESS to _RESET_ADDR value of application linker script*/
 
 // For PIC32MX1xx and PIC32MX2xx Controllers only
-#define USER_APP_RESET_ADDRESS 	(APP_FLASH_BASE_ADDRESS + 0x1000)
+#define USER_APP_RESET_ADDRESS 	(APP_FLASH_BASE_ADDRESS + 0x1001)
 
 #define STATUS_LED      LATAbits.LATA0
 #define MODE_LED        LATAbits.LATA1

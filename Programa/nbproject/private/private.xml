@@ -12,13 +12,10 @@
     </editor-bookmarks>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
         <group>
-            <file>file:/C:/Users/walte/OneDrive/Documentos/Git/pic32mmBoot/Programa/log.c</file>
-            <file>file:/C:/Users/walte/OneDrive/Documentos/Git/pic32mmBoot/Programa/pgm.h</file>
+            <file>file:/C:/Users/walte/OneDrive/Documentos/Git/pic32mmBoot/Programa/boot_p32MM0256GPM028.ld</file>
             <file>file:/C:/Users/walte/OneDrive/Documentos/Git/pic32mmBoot/Programa/pgm.c</file>
-            <file>file:/C:/Users/walte/OneDrive/Documentos/Git/pic32mmBoot/Programa/flash/plib_nvm.c</file>
             <file>file:/C:/Users/walte/OneDrive/Documentos/Git/pic32mmBoot/Programa/config.h</file>
             <file>file:/C:/Users/walte/OneDrive/Documentos/Git/pic32mmBoot/Programa/app_p32MM0256GPM028.ld</file>
-            <file>file:/C:/Users/walte/OneDrive/Documentos/Git/pic32mmBoot/Programa/flash/plib_nvm.h</file>
         </group>
     </open-files>
 </project-private>

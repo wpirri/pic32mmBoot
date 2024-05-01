@@ -117,9 +117,8 @@ void __attribute__((optimize("-O0"))) JumpToApp( void )
     MODE_LED = 1;
     AUX_LED = 0;
     Log("[JumpToApp] Iniciando....");
-    for(unsigned long i = 10000000; i > 0; i--);
 
-    fptr = (void (*)(void))KVA0_TO_KVA1(USER_APP_RESET_ADDRESS);
+    fptr = (void (*)(void))/*KVA0_TO_KVA1*/(USER_APP_RESET_ADDRESS);
 
     (void) __builtin_disable_interrupts();
 

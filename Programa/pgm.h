@@ -21,11 +21,7 @@
 #include "sd/fsio.h"
 #include "flash/plib_nvm.h"
 
-#define FLASH_START                             (0x9d000000UL)
-#define FLASH_LENGTH                            (0x40000UL)
-#define PAGE_SIZE                               (256UL)
 #define ERASE_BLOCK_SIZE                        (2048UL)
-#define PAGES_IN_ERASE_BLOCK                    (ERASE_BLOCK_SIZE / PAGE_SIZE)
 #define DEV_CONFIG_REG_BASE_ADDRESS             (0xF80000)
 #define DEV_CONFIG_REG_END_ADDRESS              (0xF80012)
 
