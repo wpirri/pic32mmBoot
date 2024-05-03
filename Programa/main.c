@@ -401,7 +401,8 @@ int main(void)
             {
                 /* Cuando encuentra el registro final sale con 1 */
                 Log("[main] Fin de carga de programa.");
-                JumpToApp();
+                RestartForRun();
+                /*JumpToApp();*/
             }
             else if(rc < 0)
             {

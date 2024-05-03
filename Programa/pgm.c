@@ -109,7 +109,7 @@ int readLine(void *ptr, size_t max_len, FSFILE *stream)
 }
 
 /* ************************************************************************** */
-void __attribute__((optimize("-O0"))) JumpToApp( void )
+void JumpToApp( void )
 {
     void (*fptr)(void);
     
@@ -354,4 +354,26 @@ int CheckHexRecord(uint8_t* HexRecord)
     }
     /* Le falta el record final */
     return 0;
+}
+
+void __attribute__((optimize("-O0"))) RestartForRun( void )
+{
+    FSremove(PROGRAM_FILE_NAME);
+    Log("[RestartForRun] Reiniciando...");
+    for(unsigned long i = 0; i < 1000000; i++);
+    /* The following code illustrates a software Reset */
+    // assume interrupts are disabled
+    // assume the DMA controller is suspended
+    // assume the device is locked
+    /* perform a system unlock sequence */
+    // starting critical sequence
+    SYSKEY = 0x00000000; //write invalid key to force lock
+    SYSKEY = 0xAA996655; //write key1 to SYSKEY
+    SYSKEY = 0x556699AA; //write key2 to SYSKEY
+    /* set SWRST bit to arm reset */
+    RSWRSTSET = 1;
+    /* read RSWRST register to trigger reset */
+    unsigned int dummy; dummy = RSWRST;
+    /* prevent any unwanted code execution until reset occurs*/
+    while(dummy | 1);
 }

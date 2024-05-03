@@ -46,4 +46,6 @@ int WriteHexRecord2Flash(uint8_t* HexRecord);
 int CheckHexRecord(uint8_t* HexRecord);
 void ConvertAsciiToHex(uint8_t* asciiRec, uint8_t* hexRec);
 
+void RestartForRun(void);
+
 #endif /* _PGM_H */

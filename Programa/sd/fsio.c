@@ -3498,7 +3498,7 @@ BYTE PopulateEntries(FILEOBJ fo, WORD *fHandle, BYTE mode)
         return CE_BADCACHEREAD;
 
     // copy the contents over
-    strncpy(dir->DIR_Name,fo->name,/*DIR_NAMECOMP*/ DIR_NAMESIZE);
+    strncpy(dir->DIR_Name,fo->name,DIR_NAMECOMP);
 
     // setup no attributes
     if (mode == DIRECTORY)

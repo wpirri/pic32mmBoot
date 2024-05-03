@@ -65,12 +65,12 @@
 // Summary: A macro to enable/disable file search functions.
 // Description: The ALLOW_FILESEARCH definition can be commented out to disable file search functions in the library.  This will
 //              prevent the use of the FindFirst and FindNext functions and reduce code size.
-//#define ALLOW_FILESEARCH
+#define ALLOW_FILESEARCH
 
 // Summary: A macro to enable/disable write functionality
 // Description: The ALLOW_WRITES definition can be commented out to disable all operations that write to the device.  This will
 //              greatly reduce code size.
-//#define ALLOW_WRITES
+#define ALLOW_WRITES
 
 
 // Summary: A macro to enable/disable format functionality
