@@ -61,7 +61,7 @@
 #pragma config WINDIS = OFF    //Windowed Watchdog Timer Disable bit->Watchdog timer is in non-window mode
 #pragma config RWDTPS = PS1024    //Run Mode Watchdog Timer Postscale Selection bits->1:1024
 #pragma config RCLKSEL = LPRC    //Run Mode Watchdog Timer Clock Source Selection bits->Clock source is LPRC (same as for sleep mode)
-#pragma config FWDTEN = OFF             // Watchdog Timer Enable bit (WDT is disabled)
+#pragma config FWDTEN = ON    //Watchdog Timer Enable bit->WDT is enabled
 
 // FOSCSEL
 #pragma config FNOSC = PLL    //Oscillator Selection bits->Primary or FRC oscillator with PLL
@@ -252,7 +252,8 @@ int main(void)
 /* ************************************************************************** */
 
     LogInit();
-            
+
+    Log("[main] ********** BootLoader **********");
     NVM_Initialize();
     
     // Initialize the File System
@@ -313,6 +314,7 @@ int main(void)
     {
         while((byteread = readLine(ascii_buffer, 80, boot_file)) > 0)
         {
+            WDTCONbits.WDTCLRKEY = 0x5743;
             /* Cada vez que leo bien reseteo el contador de errores */
             readretry = READ_RETRY;
             /* Voy contando lo bytes leidos */

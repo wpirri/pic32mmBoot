@@ -174,6 +174,7 @@ void EraseFlash(void)
         flashAddr < APP_FLASH_END_ADDRESS;
         flashAddr += ERASE_BLOCK_SIZE)
     {
+        WDTCONbits.WDTCLRKEY = 0x5743;
         (void) NVM_PageErase(flashAddr);
 
         while(NVM_IsBusy()) {}
@@ -223,6 +224,7 @@ int WriteHexRecord2Flash(uint8_t* HexRecord)
                 HexRecordSt.Address.Val = HexRecordSt.Address.Val + HexRecordSt.ExtLinAddress.Val + HexRecordSt.ExtSegAddress.Val;
                 while(HexRecordSt.RecDataLen) // Loop till all bytes are done.
                 {
+                    WDTCONbits.WDTCLRKEY = 0x5743;
                     // Convert the Physical address to Virtual address.
                     ProgAddress = (uint32_t)PA_TO_KVA0(HexRecordSt.Address.Val);
                     // Make sure we are not writing boot area and device configuration bits.
@@ -359,8 +361,8 @@ int CheckHexRecord(uint8_t* HexRecord)
 void __attribute__((optimize("-O0"))) RestartForRun( void )
 {
     FSremove(PROGRAM_FILE_NAME);
-    Log("[RestartForRun] Reiniciando...");
-    for(unsigned long i = 0; i < 1000000; i++);
+    Log("[RestartForRun] ********** Restart **********");
+    for(unsigned long i = 0; i < 1000000; i++) { WDTCONbits.WDTCLRKEY = 0x5743; }
     /* The following code illustrates a software Reset */
     // assume interrupts are disabled
     // assume the DMA controller is suspended
@@ -375,5 +377,5 @@ void __attribute__((optimize("-O0"))) RestartForRun( void )
     /* read RSWRST register to trigger reset */
     unsigned int dummy; dummy = RSWRST;
     /* prevent any unwanted code execution until reset occurs*/
-    while(dummy | 1);
+    while(dummy | 1) { WDTCONbits.WDTCLRKEY = 0x5743; }
 }
