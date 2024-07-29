@@ -9,18 +9,30 @@ El archivo pgm.hex del programa a ser cargado debe generarse con la opción de n
 El programa a cargar debe tener los mismo bits de configuración que el bottloader (ver inicio de main.c)
 
 // FDEVOPT
+
 #pragma config SOSCHP = OFF    //Secondary Oscillator High Power Enable bit->SOSC oprerates in normal power mode.
+
 #pragma config ALTI2C = OFF    //Alternate I2C1 Pins Location Enable bit->Primary I2C1 pins are used
+
 #pragma config FUSBIDIO = OFF    //USBID pin control->USBID pin is controlled by the USB module
+
 #pragma config FVBUSIO = OFF    //VBUS Pin Control->VBUS pin is controlled by the USB module
 
+
+
 // FICD
+
 #pragma config JTAGEN = OFF             // JTAG Enable bit (JTAG is disabled)
+
 #pragma config ICS = PGx1               // ICE/ICD Communication Channel Selection bits (Communicate on PGEC3/PGED3)
 
+
 // FPOR
+
 #pragma config BOREN = BOR3             // Brown-out Reset Enable bits (Brown-out Reset enabled in hardware; SBOREN bit disabled)
+
 #pragma config RETVR = OFF              // Retention Voltage Regulator Enable bit (Retention regulator is disabled)
+
 #pragma config LPBOREN = ON    //Downside Voltage Protection Enable bit->Low power BOR is enabled, when main BOR is disabled
 
 // FWDT
