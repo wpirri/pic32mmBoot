@@ -273,15 +273,17 @@ int main(void)
             Error(1);
         }
     }         
-
+#ifdef STATUS_LED
     STATUS_LED = 1;
+#endif
+    
     
     /* Siempre que haya un archivo en la SD lo cargo */
     boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
 
     if(boot_file == NULL)// Make sure the file is present.
     {
-        Log("[main] La tarjeta SD no tiene PGM.HEX.");
+        Log("[main] La tarjeta SD no tiene "PROGRAM_FILE_NAME".");
         if(ValidAppPresent())
         {
             Log("[main] Iniciando programa previamente cargado.");
@@ -294,18 +296,20 @@ int main(void)
 
             if(boot_file == NULL)// Make sure the file is present.
             {
-                Log("[main] La tarjeta SD no tiene PGMBK.HEX.");
+                Log("[main] La tarjeta SD no tiene "PROGRAM_FILE_NAME".");
                 //Indicate error and stay in while loop.
                 Error(2);
             }
         }
     }     
 
-    Log("[main] PGM.HEX encontrado.");
+    Log("[main] "PROGRAM_FILE_NAME" encontrado.");
+#ifdef MODE_LED
     MODE_LED = 1;
+#endif
 
 #ifdef VERIFY_PROGRAM
-    Log("[main] Verificando archivo PGM.HEX.");
+    Log("[main] Verificando archivo "PROGRAM_FILE_NAME".");
     /* Verifico el archivo HEX */
     bytecount = 0;
     readretry = READ_RETRY;
@@ -352,12 +356,14 @@ int main(void)
 
     }
 
+#ifdef STATUS_LED
     STATUS_LED = 0;
+#endif
 
     /* Si el HEX no sirve */
     if(validHex == 0)
     {
-        Log("[main] Archivo PGM.HEX invalido.");
+        Log("[main] Archivo "PROGRAM_FILE_NAME" invalido.");
         if(ValidAppPresent())
         {
             Log("[main] Iniciando programa previamente cargado.");
@@ -373,7 +379,7 @@ int main(void)
 
     /* Cierro el archivo */
     FSfclose(boot_file);
-    Log("[main] PGM.HEX verificado.");
+    Log("[main] "PROGRAM_FILE_NAME" verificado.");
     /* Lo vuelvo a abrir */
     boot_file = FSfopen(PROGRAM_FILE_NAME, "r");
     if( !boot_file) boot_file = FSfopen(PROGRAM_FILE_NAME_BK, "r");
@@ -382,7 +388,9 @@ int main(void)
     // Erase Flash (Block Erase the program Flash)
     EraseFlash();
 
+#ifdef MODE_LED
     MODE_LED = 0;
+#endif
     
     Log("[main] Cargando programa.");
     /* Un parche de reintentos para salvar errores de lectura de las SD */

@@ -16,6 +16,14 @@
                     <name>default</name>
                     <type>2</type>
                 </confElem>
+                <confElem>
+                    <name>Dom32WiFi</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>Dom32Touch</name>
+                    <type>2</type>
+                </confElem>
             </confList>
             <formatting>
                 <project-formatting-style>false</project-formatting-style>

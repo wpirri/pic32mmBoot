@@ -516,11 +516,18 @@ void MDD_SDSPI_InitIO (void)
     SYSKEY = 0x556699AA; //write Key2 to SYSKEY
     // unlock PPS
     RPCONbits.IOLOCK = 0;
+#ifdef DOM32WIFI
     // Mapeo de SPI */
-    RPOR1bits.RP6R = 0x0008;        //RB0->SPI2:SDO2
-    RPINR11bits.SDI2R = 0x0007;     //RB1->SPI2:SDI2
-    RPOR0bits.RP3R = 0x0009;        //RA2->SPI2:SCK2OUT
-    RPINR11bits.SCK2INR = 0x0003;   //RA2->SPI2:SCK2OUT
+    RPOR1bits.RP6R = 8;        //RB0->SPI2:SDO2
+    RPINR11bits.SDI2R = 7;     //RB1->SPI2:SDI2
+    RPOR0bits.RP3R = 9;        //RA2->SPI2:SCK2OUT
+#endif
+#ifdef DOM32TOUCH
+    RPOR4bits.RP17R = 8;        // RP17 -> SPI2:SDO2
+    RPOR3bits.RP15R = 9;        // RP15 -> SPI2:SCK2OUT
+    RPINR11bits.SDI2R = 16;     // SPI2:SDI2 -> RP16
+#endif
+    
     // lock   PPS
     RPCONbits.IOLOCK = 1; 
     // System Reg Lock

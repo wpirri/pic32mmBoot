@@ -48,46 +48,147 @@
 // Define the SPI frequency
 #define SPI_FREQUENCY			(20000000)
 // Description: SD-SPI Chip Select Output bit
+#ifdef DOM32WIFI
 #define SD_CS               LATBbits.LATB6
+#endif
+#ifdef DOM32TOUCH
+#define SD_CS               LATBbits.LATB11
+#endif
+
 // Description: SD-SPI Chip Select TRIS bit
+#ifdef DOM32WIFI
 #define SD_CS_TRIS          TRISBbits.TRISB6
+#endif
+#ifdef DOM32TOUCH
+#define SD_CS_TRIS          TRISBbits.TRISB11
+#endif
 // Control de presencia de la tarjeta SD por soft (no por sensor en zócalo)
+#ifdef DOM32WIFI
 //#define MEDIA_SOFT_DETECT
+#endif
+#ifdef DOM32TOUCH
+//#define MEDIA_SOFT_DETECT
+#endif
 // Description: SD-SPI Card Detect Input bit
+#ifdef DOM32WIFI
 //#define SD_CD               PORTFbits.RF0
+#endif
+#ifdef DOM32TOUCH
+//#define SD_CD               PORTFbits.RF0
+#endif
 // Description: SD-SPI Card Detect TRIS bit
+#ifdef DOM32WIFI
 //#define SD_CD_TRIS          TRISFbits.TRISF0
+#endif
+#ifdef DOM32TOUCH
+//#define SD_CD_TRIS          TRISFbits.TRISF0
+#endif
 // Description: SD-SPI Write Protect Check Input bit
+#ifdef DOM32WIFI
 //#define SD_WE               PORTFbits.RF1
+#endif
+#ifdef DOM32TOUCH
+//#define SD_WE               PORTFbits.RF1
+#endif
 // Description: SD-SPI Write Protect Check TRIS bit
+#ifdef DOM32WIFI
 //#define SD_WE_TRIS          TRISFbits.TRISF1
+#endif
+#ifdef DOM32TOUCH
+//#define SD_WE_TRIS          TRISFbits.TRISF1
+#endif
 // Description: The main SPI control register
+#ifdef DOM32WIFI
 #define SPIxCON              SPI2CON
+#endif
+#ifdef DOM32TOUCH
+#define SPIxCON              SPI2CON
+#endif
 // Description: The SPI status register
+#ifdef DOM32WIFI
 #define SPIxSTAT             SPI2STAT
+#endif
+#ifdef DOM32TOUCH
+#define SPIxSTAT             SPI2STAT
+#endif
 // Description: The SPI Buffer
+#ifdef DOM32WIFI
 #define SPIxBUF              SPI2BUF
+#endif
+#ifdef DOM32TOUCH
+#define SPIxBUF              SPI2BUF
+#endif
 // Description: The bitwise define for the SPI control register (i.e. _____bits)
+#ifdef DOM32WIFI
 #define SPIxCONbits         SPI2CONbits
+#endif
+#ifdef DOM32TOUCH
+#define SPIxCONbits         SPI2CONbits
+#endif
 // Description: The bitwise define for the SPI status register (i.e. _____bits)
+#ifdef DOM32WIFI
 #define SPIRBF              SPI2STATbits.SPIRBF
+#endif
+#ifdef DOM32TOUCH
+#define SPIRBF              SPI2STATbits.SPIRBF
+#endif
 // Description: The enable bit for the SPI module
+#ifdef DOM32WIFI
 #define SPIENABLE           SPI2CONbits.ON
+#endif
+#ifdef DOM32TOUCH
+#define SPIENABLE           SPI2CONbits.ON
+#endif
 // Description: The definition for the SPI baud rate generator register (PIC32)
+#ifdef DOM32WIFI
 #define SPIBRG			    SPI2BRG
+#endif
+#ifdef DOM32TOUCH
+#define SPIBRG			    SPI2BRG
+#endif
 // Tris pins for SCK/SDI/SDO lines
 // Description: The TRIS bit for the SCK pin
+#ifdef DOM32WIFI
 #define SPICLOCK            TRISAbits.TRISA2
+#endif
+#ifdef DOM32TOUCH
+#define SPICLOCK            TRISBbits.TRISB13
+#endif
 // Description: The TRIS bit for the SDI pin
+#ifdef DOM32WIFI
 #define SPIIN               TRISBbits.TRISB1
+#endif
+#ifdef DOM32TOUCH
+#define SPIIN               TRISBbits.TRISB14
+#endif
 // Description: The TRIS bit for the SDO pin
+#ifdef DOM32WIFI
 #define SPIOUT              TRISBbits.TRISB0
+#endif
+#ifdef DOM32TOUCH
+#define SPIOUT              TRISBbits.TRISB15
+#endif
 //
+#ifdef DOM32WIFI
 #define SPITBE              SPI2STATbits.SPITBE
+#endif
+#ifdef DOM32TOUCH
+#define SPITBE              SPI2STATbits.SPITBE
+#endif
 //
+#ifdef DOM32WIFI
 #define SPIRBF              SPI2STATbits.SPIRBF
+#endif
+#ifdef DOM32TOUCH
+#define SPIRBF              SPI2STATbits.SPIRBF
+#endif
 //
+#ifdef DOM32WIFI
 #define __SPIxCONbits_t     __SPI2CONbits_t
+#endif
+#ifdef DOM32TOUCH
+#define __SPIxCONbits_t     __SPI2CONbits_t
+#endif
 
 /*****************************************************************/
 /*                  Strcutures and defines                       */

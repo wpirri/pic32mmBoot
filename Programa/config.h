@@ -12,8 +12,15 @@
 #define READ_RETRY 100
 #define VERIFY_PROGRAM
 
+#ifdef DOM32WIFI
 #define PROGRAM_FILE_NAME       "PGM.HEX"
 #define PROGRAM_FILE_NAME_BK    "PGMBK.HEX"
+#endif
+
+#ifdef DOM32TOUCH
+#define PROGRAM_FILE_NAME       "DOMTOUCH.HEX"
+#define PROGRAM_FILE_NAME_BK    "DOMTOUCK.HEX"
+#endif
 
 /* ************************************************************************** */
 /* Estos valores dependen de lo definido en el Linker Script                  */
@@ -49,9 +56,15 @@
 // For PIC32MX1xx and PIC32MX2xx Controllers only
 #define USER_APP_RESET_ADDRESS 	(APP_FLASH_BASE_ADDRESS + 0x1001)
 
+#ifdef DOM32WIFI
 #define STATUS_LED      LATAbits.LATA0
 #define MODE_LED        LATAbits.LATA1
 #define AUX_LED         LATAbits.LATA4
+#endif
+
+#ifdef DOM32TOUCH
+#define AUX_LED         LATAbits.LATA0
+#endif
 
 // Clock frequency values
 #define _XTAL_FREQ  24000000UL             // Hz

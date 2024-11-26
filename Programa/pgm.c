@@ -113,9 +113,16 @@ void JumpToApp( void )
 {
     void (*fptr)(void);
     
+#ifdef STATUS_LED
     STATUS_LED = 1;
+#endif
+#ifdef MODE_LED
     MODE_LED = 1;
+#endif
+#ifdef AUX_LED
     AUX_LED = 0;
+#endif
+    
     Log("[JumpToApp] Iniciando....");
 
     fptr = (void (*)(void))/*KVA0_TO_KVA1*/(USER_APP_RESET_ADDRESS);

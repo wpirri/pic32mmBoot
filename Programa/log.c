@@ -38,8 +38,12 @@ void LogInit(void)
     // unlock PPS
     RPCONbits.IOLOCK = 0;
     // Mapeo de UART2
+#ifdef DOM32WIFI    
     RPOR0bits.RP4R = 0x0004;    //RA3->UART2:U2TX
-    //RPINR9bits.U2RXR = 0x0003;    //RA2->UART2:U2RX
+#endif
+#ifdef DOM32TOUCH
+    RPOR4bits.RP18R = 0x0004;    // UART2:U2TX -> RP9
+#endif
     // lock   PPS
     RPCONbits.IOLOCK = 1; 
     // System Reg Lock
@@ -87,7 +91,9 @@ void Log(const char* msg)
 void BlinkLed(unsigned int period)
 {
     static unsigned char i;
+#ifdef AUX_LED
     if( !((++i) % period) ) AUX_LED ^= 1;
+#endif
 }
 
 /******************************************************************************
@@ -105,7 +111,9 @@ void __attribute__((optimize("-O0"))) Error( unsigned int err )
      * 4: Error de lectura cargando programa
      * 5: Error de checksum cargando programa
      */
+#ifdef AUX_LED
     AUX_LED = 0;
+#endif
     pulse_count = err;
     loop_count = 10;
     for(delay_count = 1000000; delay_count > 0; delay_count--);
@@ -114,12 +122,16 @@ void __attribute__((optimize("-O0"))) Error( unsigned int err )
         for(delay_count = 1000000; delay_count > 0; delay_count--);
         if(pulse_count)
         {
+#ifdef AUX_LED
             AUX_LED = 1;
+#endif
             pulse_count--;
         }
         loop_count--;
         for(delay_count = 1000000; delay_count > 0; delay_count--);
+#ifdef AUX_LED
         AUX_LED = 0;
+#endif
         if( !loop_count)
         {
             pulse_count = err;

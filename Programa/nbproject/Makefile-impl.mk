@@ -27,11 +27,11 @@ CLEAN_SUBPROJECTS=${CLEAN_SUBPROJECTS_${SUBPROJECTS}}
 PROJECTNAME=Programa
 
 # Active Configuration
-DEFAULTCONF=default
+DEFAULTCONF=Dom32Touch
 CONF=${DEFAULTCONF}
 
 # All Configurations
-ALLCONFS=default 
+ALLCONFS=default Dom32WiFi Dom32Touch 
 
 
 # build
@@ -46,12 +46,16 @@ ALLCONFS=default
 # clobber
 .clobber-impl: .clobber-pre .depcheck-impl
 	    ${MAKE} SUBPROJECTS=${SUBPROJECTS} CONF=default clean
+	    ${MAKE} SUBPROJECTS=${SUBPROJECTS} CONF=Dom32WiFi clean
+	    ${MAKE} SUBPROJECTS=${SUBPROJECTS} CONF=Dom32Touch clean
 
 
 
 # all
 .all-impl: .all-pre .depcheck-impl
 	    ${MAKE} SUBPROJECTS=${SUBPROJECTS} CONF=default build
+	    ${MAKE} SUBPROJECTS=${SUBPROJECTS} CONF=Dom32WiFi build
+	    ${MAKE} SUBPROJECTS=${SUBPROJECTS} CONF=Dom32Touch build
 
 
 
